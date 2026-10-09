@@ -38,7 +38,7 @@ export function renderCatalog(state) {
       <span class="stack-6 pad-s">
         <b class="h3">${esc(m.name)}</b>
         ${purpose ? chip(purpose.name, g) : ''}
-        <span class="row-between small muted"><span>напечатано ${st.units} шт.</span><b class="ink">${st.avgUnit ? money(st.avgUnit) : '—'}</b></span>
+        <span class="small muted">напечатано ${st.units} шт.</span>
       </span>
     </a>`;
   }).join('')}</div>` : emptyBox('Моделей пока нет — они появятся сами после первой печати.')}`;
