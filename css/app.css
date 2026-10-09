@@ -348,3 +348,10 @@ code { background: var(--soft); border-radius: 6px; padding: 1px 6px; font-size:
 .brand > span { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .brand #sync-pill .sync-pill { padding: 3px 10px; font-size: 12px; }
 .mat-fields { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.1fr) 110px; }
+
+/* Удаление строки в журнале печатей */
+.pt-wrap { display: flex; align-items: center; border-bottom: 1px solid var(--line2); }
+.pt-wrap .pt-row { flex: 1; min-width: 0; border-bottom: 0; padding-right: 8px; }
+.pt-head.with-del { padding-right: 72px; }
+.del-btn { margin-right: 16px; }
+.del-btn:hover { background: var(--red-soft); color: var(--red); }

@@ -136,16 +136,18 @@ export function renderHome(state) {
   </div>`;
 }
 
-export function printRow(state, p) {
+export function printRow(state, p, withDelete = false) {
   const st = STATUS[p.status] || STATUS.done;
   const purpose = p.outputs?.length > 1 ? chip('несколько', GROUP_STYLE.other) : purposeChip(state, p.outputs?.[0]?.purposeId || p.purposeId);
-  return `<a class="pt-row" href="#/print/${p.id}">
+  const row = `<a class="pt-row" href="#/print/${p.id}">
     <span class="muted">${dateShort(p.date)}</span>
     <span><b>${esc(modelName(state, p.modelId))}</b> <span class="muted">· ${p.qty} шт.</span></span>
     <span>${purpose}</span>
     <span>${chip(st.label, st)}</span>
     <b class="right">${p.finalized ? money(p.totals.full) : '—'}</b>
   </a>`;
+  if (!withDelete) return row;
+  return `<div class="pt-wrap">${row}<button class="icon-btn del-btn" data-act="delete-print" data-id="${p.id}" aria-label="Удалить печать" title="Удалить">${icon.trash(17)}</button></div>`;
 }
 
 function printingCard(state, p) {

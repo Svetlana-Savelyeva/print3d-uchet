@@ -29,8 +29,8 @@ export function renderPrints(state, route) {
   </div>
   ${filter === 'sellable' ? '<div class="note">Выберите печать — в её карточке есть цена и кнопка «Подтвердить продажу».</div>' : ''}
   ${list.length ? `<div class="card flush"><div class="table-scroll"><div class="ptable">
-    <div class="pt-head"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right">Полная</span></div>
-    ${list.map((p) => printRow(state, p)).join('')}
+    <div class="pt-head with-del"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right">Полная</span></div>
+    ${list.map((p) => printRow(state, p, true)).join('')}
   </div></div></div>` : emptyBox('Здесь пока пусто.')}`;
 }
 
@@ -167,13 +167,23 @@ export const printActions = {
     openFailureModal(store.state, { ...p });
   },
   'delete-print': (el) => {
-    const p = store.state.prints.find((x) => x.id === el.dataset.id);
-    const msg = p.finalized ? 'Удалить печать? Материал вернётся на катушки отдельной записью, себестоимость уйдёт из аналитики.' : 'Отменить эту печать? Склад не менялся.';
+    const state = store.state;
+    const p = state.prints.find((x) => x.id === el.dataset.id);
+    if (!p) return;
+    const sales = state.sales.filter((s) => s.printId === p.id);
+    const name = `«${modelName(state, p.modelId)}» от ${dateShort(p.date)}`;
+    let msg = p.finalized
+      ? `Удалить печать ${name}?\n\nМатериал (${grams(p.materials.reduce((a, m) => a + m.grams, 0))}) вернётся на катушки, себестоимость уйдёт из аналитики.`
+      : `Отменить печать ${name}? Склад не менялся.`;
+    if (sales.length) msg += `\n\nВместе с ней удалятся записанные продажи: ${sales.length} (${sales.reduce((a, s) => a + s.qty, 0)} шт.).`;
     if (!confirm(msg)) return;
     try {
-      store.commit((s) => deletePrint(s, p.id));
+      store.commit((s) => {
+        for (const sale of sales) deleteSale(s, sale.id);
+        deletePrint(s, p.id);
+      });
       toast('Печать удалена');
-      ctx.go('#/prints');
+      if (location.hash.startsWith('#/print/')) ctx.go('#/prints');
     } catch (e) { toast(e.message, 'err'); }
   },
   'price-pick': (el) => {
