@@ -164,6 +164,8 @@ export function renderSettings(state) {
       ${field('Упаковка, ₽ за шт.', numInput('packCost', s.packCost))}
       ${field('Валюта', `<input name="currency" value="${esc(s.currency)}">`)}
     </div>
+    <div class="h3">Merino Home</div>
+    ${field('Доля собственника по умолчанию, %', numInput('ownerShare', s.ownerShare ?? 70), 'Цена изделия для Merino Home делится: эту часть платит собственник (ваша выручка), остальное — вы. В каждой печати можно поменять.')}
     <div class="h3">Склад</div>
     ${field('Предупреждать, когда остаток меньше, г', numInput('lowStockG', s.lowStockG))}
     <button class="btn primary" type="submit">Сохранить</button>
@@ -253,10 +255,15 @@ function download(name, content, type) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+function ownerCsv(p) {
+  const rs = (p.outputs || []).filter((o) => C.num(o.ownerShare) > 0).map((o) => C.ownerResult(o, p.split.unit, p.split.unitContribution));
+  if (!rs.length) return ['', '', ''];
+  return [rs[0].price, C.round2(rs.reduce((a, r) => a + r.owner, 0)), C.round2(rs.reduce((a, r) => a + r.profit, 0))];
+}
 function csvFor(state, kind) {
   const pName = (id) => state.purposes.find((p) => p.id === id)?.name || '';
-  if (kind === 'prints') return [['Дата', 'Модель', 'Статус', 'Шт.', 'Годных', 'Назначение', 'Граммы', 'Часы', 'Материалы', 'Электричество', 'Доп. расходы', 'Прямая', 'Амортизация', 'Эксплуатационные', 'Полная', 'За 1 шт.', 'Брак, ₽'],
-    ...state.prints.filter((p) => p.finalized).map((p) => [p.date, modelName(state, p.modelId), p.status, p.qty, p.split.good, (p.outputs || []).map((o) => `${pName(o.purposeId)} ${o.qty}`).join(', '), p.materials.reduce((a, m) => a + m.grams, 0), p.hours, p.totals.material, p.totals.electricity, p.totals.extra, p.totals.direct, p.totals.amortization, p.totals.ops, p.totals.full, p.split.unit, p.split.failCost])];
+  if (kind === 'prints') return [['Дата', 'Модель', 'Статус', 'Шт.', 'Годных', 'Назначение', 'Граммы', 'Часы', 'Материалы', 'Электричество', 'Доп. расходы', 'Прямая', 'Амортизация', 'Эксплуатационные', 'Полная', 'За 1 шт.', 'Брак, ₽', 'Цена Merino Home за 1 шт.', 'Собственнику, ₽', 'Прибыль Merino Home, ₽'],
+    ...state.prints.filter((p) => p.finalized).map((p) => [p.date, modelName(state, p.modelId), p.status, p.qty, p.split.good, (p.outputs || []).map((o) => `${pName(o.purposeId)} ${o.qty}`).join(', '), p.materials.reduce((a, m) => a + m.grams, 0), p.hours, p.totals.material, p.totals.electricity, p.totals.extra, p.totals.direct, p.totals.amortization, p.totals.ops, p.totals.full, p.split.unit, p.split.failCost, ...ownerCsv(p)])];
   if (kind === 'spools') return [['Катушка', 'Материал', 'Цвет', 'Куплено, г', 'Потрачено, г', 'Остаток, г', 'Цена грамма', 'Стоимость остатка', 'Дата покупки'],
     ...state.spools.map((s) => { const st = C.spoolStats(s, state.movements); return [spoolLabel(s), s.material, s.colorName, st.bought, st.used, st.left, C.round2(s.costPerG), st.value, s.date]; })];
   if (kind === 'purchases') return [['Дата', 'Название', 'Категория', 'Тип', 'Сумма', 'Магазин', 'Комментарий'],
@@ -347,7 +354,7 @@ export const moreForms = {
   },
   settings: (form, f) => {
     store.commit((s) => {
-      for (const k of ['tariff', 'printerW', 'extraW', 'mpFee', 'packCost', 'lowStockG']) s.settings[k] = C.num(f[k]);
+      for (const k of ['tariff', 'printerW', 'extraW', 'mpFee', 'packCost', 'lowStockG', 'ownerShare']) s.settings[k] = C.num(f[k]);
       s.settings.currency = f.currency || '₽';
     });
     toast('Настройки сохранены');

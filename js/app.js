@@ -124,6 +124,12 @@ document.addEventListener('input', (e) => {
     if (res === 'rerender') render(); else refreshLive(store.state);
     return;
   }
+  const op = t.closest('form[data-form="owner-price"]');
+  if (op) {
+    if (t.name === 'price') op.querySelector('input[name="mode"][value="own"]').checked = true;
+    op.querySelectorAll('.price-opt').forEach((l) => l.classList.toggle('on', l.querySelector('input[name="mode"]').checked));
+    return;
+  }
   const sale = t.closest('form[data-live="sale"]');
   if (sale) {
     const p = store.state.prints.find((x) => x.id === sale.dataset.id);

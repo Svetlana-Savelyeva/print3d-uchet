@@ -1,6 +1,6 @@
 // Журнал печатей и карточка печати: расшифровка себестоимости, фото, цена и продажа.
 import * as C from '../calc.js';
-import { store, today, modelName, deletePrint, recordSale, deleteSale, sellableQty, photos, spoolLabel, uid } from '../store.js';
+import { store, today, modelName, setOwnerPrice, deletePrint, recordSale, deleteSale, sellableQty, photos, spoolLabel, uid } from '../store.js';
 import { ctx, esc, money, money0, grams, nf, hoursText, dateText, dateShort, icon, chip, purposeChip, STATUS, GROUP_STYLE, pageHead, emptyBox, field, numInput, toast, photoImg, compressImage } from '../ui.js';
 import { printRow } from './home.js';
 import { queuePhoto } from '../sync.js';
@@ -91,6 +91,7 @@ export function renderPrint(state, route) {
           <div class="bt-head"><span>Строка</span><span>База</span><span class="right">Ставка</span><span class="right">Сумма</span></div>
           ${rows.map((r) => `<div class="bt-row ${r.total ? 'total' : ''}"><span>${esc(r.label)}</span><span class="muted">${r.base || ''}</span><span class="right muted">${r.rate || ''}</span><span class="right">${money(r.amount)}</span></div>`).join('')}
           <div class="bt-foot"><span class="muted">На 1 изделие: ${money(p.totals.full)} ÷ ${sp.qty} шт.</span><b class="accent">${money(sp.unit)}</b></div>
+          ${ownerRows(p)}
           ${sp.bad ? `<div class="bt-foot fail"><span>Брак: ${sp.bad} шт.${p.failureReason ? ` · ${esc(p.failureReason)}` : ''}</span><b>${money(sp.failCost)}</b></div>
           ${sp.good ? `<div class="bt-foot"><span class="muted small">Справочно: с учётом брака одно годное изделие обошлось в ${money(sp.unitWithFailures)}</span></div>` : ''}` : ''}
         </div></div>
@@ -109,10 +110,19 @@ export function renderPrint(state, route) {
         ${p.materials.map((m) => { const s = state.spools.find((x) => x.id === m.spoolId); return `<a class="spool-mini" href="#/spool/${m.spoolId}"><span class="swatch" style="width:30px;height:30px;background:${esc(s?.hex || '#ccc')}"></span><span class="grow"><b>${esc(s ? spoolLabel(s) : m.spoolName)}</b><small class="muted">${esc(C.ROLE_LABELS[m.role])}</small></span><b class="neg">−${grams(m.grams)}</b></a>`; }).join('')}
         ${printer ? `<div class="spool-mini"><span class="ico-badge blue">${icon.clock(16)}</span><span class="grow"><b>${esc(printer.name)}</b><small class="muted">отработано ${nf(C.equipmentHours(printer, state.prints), 1)} ч${printer.resourceHours ? ` из ${nf(printer.resourceHours, 0)} ч` : ''}</small></span><b class="accent">+${nf(p.hours)} ч</b></div>` : ''}
       </div>
-      ${sellable || sales.length ? priceAndSale(state, p, sellable, sales) : ''}
+      ${ownerPriceCard(p)}
+      ${sellable || sales.length ? saleBlock(state, p, sellable, sales) : ''}
       <button class="btn ghost danger-text" data-act="delete-print" data-id="${p.id}">${icon.trash(16)} Удалить печать</button>
     </div>
   </div>`;
+}
+
+// Для изделий Merino Home продажа на сторону — редкий случай, поэтому блок свёрнут.
+function saleBlock(state, p, sellable, sales) {
+  const html = priceAndSale(state, p, sellable, sales);
+  const forOwner = (p.outputs || []).some((o) => C.num(o.ownerShare) > 0);
+  if (!forOwner || sales.length) return html;
+  return `<details class="card sale-details"><summary>Продать на сторону вместо Merino Home</summary>${html.replace('<div class="card stack-12">', '<div class="stack-12">')}</details>`;
 }
 
 function priceAndSale(state, p, sellable, sales) {
@@ -144,6 +154,32 @@ function priceAndSale(state, p, sellable, sales) {
     </form>` : '<div class="muted small">Все изделия этой печати проданы.</div>'}
     ${sales.length ? `<div class="stack-8"><div class="fw700">Продажи этой печати</div>${sales.map((s) => { const r = C.saleResult(s); return `<div class="money-row"><span>${dateShort(s.date)} · ${s.qty} × ${money0(s.price)} · ${s.channel === 'mp' ? 'маркетплейс' : 'лично'}</span><span class="row gap8"><b class="${r.profit < 0 ? 'neg' : 'pos'}">${r.profit < 0 ? '−' : '+'}${money(Math.abs(r.profit))}</b><button class="icon-btn" data-act="delete-sale" data-id="${s.id}" aria-label="Удалить продажу">${icon.trash(15)}</button></span></div>`; }).join('')}</div>` : ''}
   </div>`;
+}
+
+function ownerRows(p) {
+  const rows = (p.outputs || []).filter((o) => C.num(o.ownerShare) > 0);
+  if (!rows.length) return '';
+  return rows.map((o) => {
+    const r = C.ownerResult(o, p.split.unit, p.split.unitContribution);
+    return `<div class="bt-foot owner"><span>Merino Home · ${o.qty} шт. × ${money(r.price)} = ${money(r.total)}<br><small class="muted">собственнику ${nf(r.share * 100, 1)} % · вам ${nf(100 - r.share * 100, 1)} % (${money(r.mine)})</small></span><span class="right"><b>${money(r.owner)}</b><br><small class="${r.profit < 0 ? 'neg' : 'pos'}">прибыль ${money(r.profit)}</small></span></div>`;
+  }).join('');
+}
+
+function ownerPriceCard(p) {
+  const o = (p.outputs || []).find((x) => C.num(x.ownerShare) > 0);
+  if (!o) return '';
+  const unit = p.split.unit;
+  const opts = [['m50', 'Наценка 50 %', C.ownerUnitPrice(unit, 'm50')], ['m100', 'Наценка 100 %', C.ownerUnitPrice(unit, 'm100')]];
+  const mode = p.ownerPriceMode || 'm100';
+  return `<form class="card stack-12" data-form="owner-price" data-id="${p.id}">
+    <div class="h3">Цена для Merino Home <span class="muted small">за 1 шт.</span></div>
+    <div class="stack-8">
+      ${opts.map(([v, l, price]) => `<label class="price-opt ${mode === v ? 'on' : ''}"><input type="radio" name="mode" value="${v}" ${mode === v ? 'checked' : ''} hidden><span class="row-between"><b>${l}</b><b class="h3">${money(price)}</b></span><span class="row-between small muted"><span>${nf(unit)} × ${v === 'm50' ? '1,5' : '2'}</span><span class="pos fw700">+${money(price - unit)}</span></span></label>`).join('')}
+      <label class="price-opt ${mode === 'own' ? 'on' : ''}"><input type="radio" name="mode" value="own" ${mode === 'own' ? 'checked' : ''} hidden><span class="row-between"><b>Своя цена</b></span>${numInput('price', mode === 'own' ? String(o.unitPrice).replace('.', ',') : '', 'placeholder="₽ за 1 шт."')}</label>
+    </div>
+    ${field('Доля собственника, %', numInput('share', String(o.ownerShare), 'inputmode="numeric"'))}
+    <button class="btn soft" type="submit">Сохранить цену</button>
+  </form>`;
 }
 
 export function salePreview(p, f) {
@@ -190,7 +226,7 @@ export const printActions = {
     const input = document.getElementById('sale-price');
     if (!input) return;
     input.value = String(el.dataset.v).replace('.', ',');
-    document.querySelectorAll('.price-opt').forEach((b) => b.classList.toggle('on', b === el));
+    el.closest('.card').querySelectorAll('.price-opt').forEach((b) => b.classList.toggle('on', b === el));
     input.dispatchEvent(new Event('input', { bubbles: true }));
   },
   'delete-sale': (el) => {
@@ -201,6 +237,11 @@ export const printActions = {
 };
 
 export const printForms = {
+  'owner-price': (form, f) => {
+    if (f.mode === 'own' && !(C.num(f.price) > 0)) return toast('Впишите свою цену', 'err');
+    store.commit((s) => setOwnerPrice(s, form.dataset.id, { mode: f.mode, price: f.price, share: f.share }));
+    toast('Цена для Merino Home сохранена');
+  },
   sale: (form, f) => {
     try {
       if (!(C.num(f.price) > 0)) return toast('Укажите цену продажи', 'err');

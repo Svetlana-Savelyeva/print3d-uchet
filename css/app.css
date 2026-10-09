@@ -355,3 +355,10 @@ code { background: var(--soft); border-radius: 6px; padding: 1px 6px; font-size:
 .pt-head.with-del { padding-right: 72px; }
 .del-btn { margin-right: 16px; }
 .del-btn:hover { background: var(--red-soft); color: var(--red); }
+.split-box { border: 1px dashed #B8C0E8; border-radius: 16px; padding: 8px 12px; font-size: 14px; }
+.bt-foot.owner { background: #F7F8FE; border-top: 1px solid var(--line2); align-items: flex-start; }
+.owner-box { background: #F7F8FE; border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+label.price-opt { cursor: pointer; }
+label.price-opt input[name="price"] { margin-top: 6px; }
+.sale-details summary { cursor: pointer; font-weight: 700; color: var(--ink2); }
+.sale-details[open] summary { margin-bottom: 14px; }

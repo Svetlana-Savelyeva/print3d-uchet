@@ -260,6 +260,34 @@ export function periodRange(period, today, custom) {
 }
 const inRange = (date, r) => date >= r.from && date <= r.to;
 
+export const ownerShareOf = (o) => Math.max(0, Math.min(100, num(o.ownerShare))) / 100;
+
+/** Цена 1 шт. для Merino Home по выбранному способу: наценка 50 %, 100 % или своя цена. */
+export function ownerUnitPrice(unitCost, mode, own) {
+  if (mode === 'own' && num(own) > 0) return round2(num(own));
+  if (mode === 'm50') return round2(unitCost * 1.5);
+  if (mode === 'cost') return round2(unitCost);
+  return round2(unitCost * 2);
+}
+
+/** Расчёт по Merino Home для строки выхода печати: сколько платит собственник и что остаётся вам. */
+export function ownerResult(o, unitCost, unitContribution) {
+  const s = ownerShareOf(o);
+  const q = num(o.qty);
+  const price = num(o.unitPrice) || unitCost;
+  return {
+    share: s,
+    price,
+    total: round2(price * q),
+    owner: round2(s * price * q), // выставляется собственнику — ваша выручка
+    mine: round2((1 - s) * price * q), // ваша доля по цене (расход в учёте Merino Home)
+    ownerCost: round2(s * unitCost * q),
+    profit: round2(s * (price - unitCost) * q), // прибыль: цена минус себестоимость доли собственника
+    contribution: round2(s * (price - unitContribution) * q), // вклад в окупаемость (без амортизации)
+    myCost: round2((1 - s) * unitCost * q), // ваша доля себестоимости
+  };
+}
+
 export function purposeGroup(state, purposeId) {
   return state.purposes.find((p) => p.id === purposeId)?.group || 'other';
 }
@@ -270,11 +298,21 @@ export function dashboard(state, range) {
   const byGroup = Object.fromEntries(Object.keys(PURPOSE_GROUPS).map((g) => [g, 0]));
   let failCost = 0;
   let economy = 0;
+  let ownerDue = 0, ownerProfit = 0, ownerCost = 0, ownerQty = 0;
   for (const p of prints) {
     failCost += p.split.failCost;
     for (const o of p.outputs || []) {
+      const s = ownerShareOf(o);
       byGroup[purposeGroup(state, o.purposeId)] += p.split.unit * o.qty;
-      if (num(o.analogPrice) > 0) economy += (num(o.analogPrice) - p.split.unit) * o.qty;
+      if (s > 0) {
+        const r = ownerResult(o, p.split.unit, p.split.unitContribution);
+        ownerDue += r.owner;
+        ownerProfit += r.profit;
+        ownerCost += r.ownerCost;
+        ownerQty += o.qty;
+      }
+      // Экономия — ваша доля: (1 − доля собственника) × (аналог − себестоимость).
+      if (num(o.analogPrice) > 0) economy += (1 - s) * (num(o.analogPrice) - p.split.unit) * o.qty;
     }
   }
   for (const g in byGroup) byGroup[g] = round2(byGroup[g]);
@@ -304,6 +342,7 @@ export function dashboard(state, range) {
     byGroup,
     failCost: round2(failCost),
     economy: round2(economy),
+    owner: { revenue: round2(ownerDue), profit: round2(ownerProfit), cost: round2(ownerCost), qty: ownerQty },
     money: round2(sum(purchases, (x) => num(x.amount))),
     moneyByKind,
     sales: {
@@ -321,19 +360,26 @@ export function payback(state) {
   const invested = round2(sum(state.purchases.filter((x) => x.kind === 'capital' || x.kind === 'tooling'), (x) => num(x.amount)));
   const capital = round2(sum(state.purchases.filter((x) => x.kind === 'capital'), (x) => num(x.amount)));
   let economy = 0;
+  let owner = 0;
   for (const p of state.prints.filter((p) => p.finalized)) {
     for (const o of p.outputs || []) {
-      if (num(o.analogPrice) > 0) economy += (num(o.analogPrice) - p.split.unitContribution) * o.qty;
+      const s = ownerShareOf(o);
+      const c = p.split.unitContribution;
+      // Собственник платит свою долю цены. Сверх живых расходов (материал, свет, расходники)
+      // это и есть вклад в окупаемость принтера.
+      if (s > 0) owner += ownerResult(o, p.split.unit, c).contribution;
+      if (num(o.analogPrice) > 0) economy += (1 - s) * (num(o.analogPrice) - c) * o.qty;
     }
   }
   const salesContribution = round2(sum(state.sales, (s) => saleResult(s).contribution));
-  const effect = round2(economy + salesContribution);
+  const effect = round2(economy + owner + salesContribution);
   const firstDate = state.purchases.filter((x) => x.kind === 'capital').map((x) => x.date).sort()[0];
   return {
     invested,
     capital,
     tooling: round2(invested - capital),
     economy: round2(economy),
+    owner: round2(owner),
     sales: salesContribution,
     effect,
     left: round2(Math.max(0, invested - effect)),

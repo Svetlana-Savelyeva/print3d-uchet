@@ -1,6 +1,6 @@
 // Запуск: node tests/calc.test.mjs
 import assert from 'node:assert/strict';
-import { computeCost, splitByQuality, priceOptions, saleResult, spoolStats, round2, payback, dashboard, periodRange } from '../js/calc.js';
+import { computeCost, splitByQuality, priceOptions, saleResult, spoolStats, round2, payback, dashboard, periodRange, ownerResult, ownerUnitPrice } from '../js/calc.js';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('✓', name); };
@@ -104,6 +104,30 @@ test('окупаемость не вычитает амортизацию пов
   assert.equal(pb.economy, 220.4);
   const d = dashboard(state, periodRange('all', '2026-10-09'));
   assert.equal(d.economy, 166.4);
+});
+
+test('Merino Home: цена с наценкой 100 %, собственник 70 %', () => {
+  // себестоимость 110,52 ₽ за 1 шт., живые расходы 44,52 ₽
+  const price = ownerUnitPrice(110.52, 'm100');
+  assert.equal(price, 221.04);
+  const r = ownerResult({ qty: 1, ownerShare: 70, unitPrice: price }, 110.52, 44.52);
+  assert.equal(r.owner, 154.73); // собственник платит 70 % цены
+  assert.equal(r.mine, 66.31); // ваша доля по цене
+  assert.equal(r.profit, 77.36); // 70 % × (221,04 − 110,52)
+  assert.equal(r.contribution, 123.56); // 70 % × (221,04 − 44,52) — в окупаемость
+});
+
+test('Merino Home в окупаемости и на главной', () => {
+  const state = {
+    purposes: [{ id: 'business', group: 'business' }],
+    purchases: [{ kind: 'capital', amount: 90000, date: '2026-10-01' }],
+    prints: [{ finalized: true, date: '2026-10-09', status: 'done', hours: 2.2, materials: [{ grams: 27 }], outputs: [{ purposeId: 'business', qty: 1, ownerShare: 70, unitPrice: 221.04 }], split: { unit: 110.52, unitContribution: 44.52, good: 1, failCost: 0 }, totals: { full: 110.52 } }],
+    sales: [],
+  };
+  assert.equal(payback(state).owner, 123.56);
+  const d = dashboard(state, periodRange('all', '2026-10-09'));
+  assert.equal(d.owner.revenue, 154.73);
+  assert.equal(d.owner.profit, 77.36);
 });
 
 console.log(`\nВсе проверки пройдены: ${passed}`);

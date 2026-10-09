@@ -28,7 +28,10 @@ export function renderHome(state) {
   groups.push({ g: 'fail', label: 'Брак', v: d.failCost });
   const groupMax = Math.max(1, ...groups.map((x) => x.v));
 
-  const effectPeriod = d.economy + dSales.profit;
+  const own = d.owner;
+  // Merino Home по цене — это тоже заработок: выручка = доля собственника, прибыль = разница с себестоимостью.
+  const earn = { revenue: dSales.revenue + own.revenue, profit: dSales.profit + own.profit };
+  const effectPeriod = d.economy + earn.profit;
 
   return `
   <div class="page-head">
@@ -59,7 +62,7 @@ export function renderHome(state) {
       <span class="kpi-ico">${icon.trend(26)}</span>
       <span class="kpi-label">Экономический эффект</span>
       <span class="kpi-value">${money0(effectPeriod)}</span>
-      <span class="kpi-sub">экономия ${money0(d.economy)} + прибыль ${money0(dSales.profit)}</span>
+      <span class="kpi-sub">экономия ${money0(d.economy)} + прибыль ${money0(earn.profit)}</span>
     </div>
   </div>
 
@@ -69,14 +72,14 @@ export function renderHome(state) {
 
   <div class="card stack-16">
     <div class="row-between wrap">
-      <div><div class="eyebrow" style="color:#6B4FD0">Продажи · ${esc(periodTitle(period).toLowerCase())}</div><div class="h2">${dSales.count ? `${dSales.count} ${plural(dSales.count, 'продажа', 'продажи', 'продаж')}` : 'Продаж пока нет'}</div></div>
+      <div><div class="eyebrow" style="color:#6B4FD0">Заработок · ${esc(periodTitle(period).toLowerCase())}</div><div class="h2">${dSales.count || own.qty ? 'Продажи и Merino Home' : 'Продаж пока нет'}</div></div>
       <a class="btn soft-purple" href="#/prints?filter=sellable">Записать продажу</a>
     </div>
     <div class="tiles">
-      <div class="tile grad-purple"><span>Выручка</span><b>${money0(dSales.revenue)}</b><small>${dSales.count ? `средний чек ${money0(dSales.revenue / dSales.count)}` : '—'}</small></div>
-      <div class="tile mint"><span>Прибыль</span><b>${money0(dSales.profit)}</b><small>после полной себестоимости и комиссий</small></div>
-      <div class="tile"><span>Продано</span><b>${dSales.qty} шт.</b><small>${dSales.count} ${plural(dSales.count, 'сделка', 'сделки', 'сделок')}</small></div>
-      <div class="tile"><span>Маржа</span><b>${dSales.revenue ? Math.round((dSales.profit / dSales.revenue) * 100) : 0} %</b><small>прибыль ÷ выручка</small></div>
+      <div class="tile grad-purple"><span>Выручка</span><b>${money0(earn.revenue)}</b><small>продажи ${money0(dSales.revenue)} · Merino Home ${money0(own.revenue)}</small></div>
+      <div class="tile mint"><span>Прибыль</span><b>${money0(earn.profit)}</b><small>продажи ${money0(dSales.profit)} · Merino Home ${money0(own.profit)}</small></div>
+      <div class="tile"><span>Продано</span><b>${dSales.qty} шт.</b><small>${dSales.count} ${plural(dSales.count, 'сделка', 'сделки', 'сделок')}${own.qty ? ` · Merino Home ${own.qty} шт.` : ''}</small></div>
+      <div class="tile"><span>Маржа</span><b>${earn.revenue ? Math.round((earn.profit / earn.revenue) * 100) : 0} %</b><small>прибыль ÷ выручка</small></div>
     </div>
     ${dSales.list.length ? `<div class="table-scroll"><div class="sales-list">${dSales.list.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((s) => `
       <a class="sale-row" href="#/print/${s.printId}">
@@ -96,6 +99,7 @@ export function renderHome(state) {
         <div class="bar-row">
           <div class="row-between"><span class="fw600">${label}</span><b>${money0(v)}</b></div>
           <div class="bar"><i style="width:${(v / groupMax) * 100}%;background:${g === 'fail' ? '#B23A2F' : GROUP_STYLE[g].bar}"></i></div>
+          ${g === 'business' && own.revenue > 0 ? `<div class="row-between small muted"><span>собственники заплатят по цене</span><b class="accent">${money0(own.revenue)}</b></div>` : ''}
         </div>`).join('')}
       <details class="how"><summary>Как рассчитано</summary>
         <div class="how-grid">
@@ -172,7 +176,7 @@ export function paybackCard(pb) {
     return `<div class="card stack-12"><div class="eyebrow" style="color:#2F9C6C">Окупаемость</div><div class="muted">Добавьте принтер в разделе «Оборудование» — здесь появится шкала окупаемости.</div></div>`;
   }
   const econW = Math.min(100, (Math.max(0, pb.economy) / pb.invested) * 100);
-  const salesW = Math.max(0, Math.min(100 - econW, (Math.max(0, pb.sales) / pb.invested) * 100));
+  const salesW = Math.max(0, Math.min(100 - econW, (Math.max(0, pb.sales + pb.owner) / pb.invested) * 100));
   const months = pb.since ? Math.max(1, monthsBetween(pb.since, today())) : 1;
   const pace = pb.effect / months;
   const left = pb.left;
@@ -193,7 +197,7 @@ export function paybackCard(pb) {
     <div class="tiles">
       <div class="tile"><span>Вложено</span><b>${money0(pb.invested)}</b><small>оборудование ${money0(pb.capital)} + оснащение ${money0(pb.tooling)}</small></div>
       <div class="tile mint"><span><i class="dot" style="background:#2F9C6C"></i>Экономия для бизнеса</span><b>${money0(pb.economy)}</b><small>не купили готовое (где указан аналог)</small></div>
-      <div class="tile lilac"><span><i class="dot" style="background:#6440C8"></i>Вклад продаж</span><b>${money0(pb.sales)}</b><small>выручка − комиссии − материалы, свет, расходники</small></div>
+      <div class="tile lilac"><span><i class="dot" style="background:#6440C8"></i>Продажи и Merino Home</span><b>${money0(pb.sales + pb.owner)}</b><small>выручка − комиссии − материалы, свет, расходники</small></div>
       <div class="tile sand"><span>Прогноз</span><b>${forecast}</b><small>${pace > 0 ? `при темпе ${money0(pace)} в месяц` : 'появится после первых продаж или экономии'}</small></div>
     </div>
     <p class="muted small">Личные изделия и подарки в окупаемость не входят. Амортизация здесь не вычитается — иначе стоимость принтера учлась бы дважды.</p>

@@ -40,11 +40,11 @@ export function buildDemo() {
   P({ modelId: hook.id, date: '2026-09-20', hours: 3, qty: 4, purposeId: 'business', analogPrice: 120, materials: [m(D, 96)] });
   P({ modelId: tea.id, date: '2026-09-27', hours: 0.5, qty: 1, purposeId: 'home', status: 'failed', failureReason: 'Проблема адгезии', materials: [m(D, 25)] });
   P({ modelId: org.id, date: '2026-10-01', hours: 4.6, qty: 1, purposeId: 'gift', materials: [m(A, 125), m(A, 6, 'support')] });
-  P({ modelId: holder.id, date: '2026-10-03', hours: 9, qty: 4, purposeId: 'business', analogPrice: 450, materials: [m(D, 286), m(D, 16, 'support')] });
+  P({ modelId: holder.id, date: '2026-10-03', hours: 9, qty: 4, purposeId: 'business', analogPrice: 450, ownerShare: 70, ownerPriceMode: 'm100', materials: [m(D, 286), m(D, 16, 'support')] });
   P({ modelId: dino.id, date: '2026-10-04', hours: 5, qty: 2, purposeId: 'family', status: 'partial', goodQty: 1, failureReason: 'Ошибка настроек', materials: [m(C, 98)] });
   P({ modelId: hook.id, date: '2026-10-05', hours: 3, qty: 4, purposeId: 'business', analogPrice: 120, materials: [m(C, 96)] });
   weighSpool(s, D.id, 607, '2026-10-06');
-  P({ modelId: holder.id, date: '2026-10-08', hours: 4.5, qty: 2, purposeId: 'business', analogPrice: 450, materials: [m(A, 112), m(A, 9, 'support'), m(A, 5, 'purge')] });
+  P({ modelId: holder.id, date: '2026-10-08', hours: 4.5, qty: 2, purposeId: 'business', analogPrice: 450, ownerShare: 70, ownerPriceMode: 'm100', materials: [m(A, 112), m(A, 9, 'support'), m(A, 5, 'purge')] });
   startPrint(s, { modelId: tea.id, printerId: printer.id, date: '2026-10-09', hours: 6.5, qty: 1, purposeId: 'home', materials: [m(F, 212)] });
 
   recordSale(s, { printId: p1.id, qty: 3, price: 350, channel: 'own', date: '2026-09-20' });

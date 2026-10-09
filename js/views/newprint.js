@@ -48,6 +48,9 @@ export function initDraft(state, query) {
     inputMode: savedMode(),
     purposeId: 'business',
     analogPrice: '',
+    ownerShare: String(state.settings.ownerShare ?? 70),
+    ownerPriceMode: 'm100',
+    ownerPrice: '',
     extraCost: '',
     kwhActual: '',
     comment: '',
@@ -77,6 +80,9 @@ export function initDraft(state, query) {
       qty: String(base.qty),
       purposeId: base.purposeId || draft.purposeId,
       analogPrice: base.analogPrice ? String(base.analogPrice) : '',
+      ownerShare: base.ownerShare != null ? String(base.ownerShare) : String(state.settings.ownerShare ?? 70),
+      ownerPriceMode: base.ownerPriceMode || 'm100',
+      ownerPrice: base.ownerPrice ? String(base.ownerPrice) : '',
       materials: base.materials.map((m) => ({
         spoolId: pickSpool(state, state.spools.find((s) => s.id === m.spoolId), m.grams),
         role: m.role,
@@ -155,7 +161,18 @@ export function renderNewPrint(state) {
         <div class="step"><span>3</span>Для чего</div>
         <div class="row wrap gap8">${state.purposes.map((p) => `
           <label class="pill-radio"><input type="radio" name="purposeId" value="${p.id}" ${p.id === d.purposeId ? 'checked' : ''}><span>${esc(p.name)}</span></label>`).join('')}</div>
-        ${purpose?.group === 'business' ? field('Сколько стоит готовый аналог (за 1 шт. с доставкой), ₽', numInput('analogPrice', d.analogPrice, 'placeholder="необязательно"'), 'Если указать, приложение посчитает экономию от самостоятельной печати.') : `<div class="muted small">${purposeHint(purpose?.group)}</div>`}
+        ${purpose?.group === 'business' ? `
+          <div class="owner-box stack-12">
+            <div class="fw700">Цена для Merino Home <span class="muted small">— делится между собственником и вами</span></div>
+            <div class="row wrap gap8">
+              ${[['m50', 'Наценка 50 %'], ['m100', 'Наценка 100 %'], ['own', 'Своя цена']].map(([v, l]) => `<label class="pill-radio"><input type="radio" name="ownerPriceMode" value="${v}" ${d.ownerPriceMode === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}
+            </div>
+            <div class="grid3">
+              ${d.ownerPriceMode === 'own' ? field('Своя цена за 1 шт., ₽', numInput('ownerPrice', d.ownerPrice, 'placeholder="например, 300"')) : ''}
+              ${field('Доля собственника, %', numInput('ownerShare', d.ownerShare, 'inputmode="numeric"'), 'остальное платите вы')}
+              ${field('Готовый аналог за 1 шт., ₽', numInput('analogPrice', d.analogPrice, 'placeholder="необязательно"'), 'для расчёта экономии')}
+            </div>
+          </div>` : `<div class="muted small">${purposeHint(purpose?.group)}</div>`}
         ${field('Комментарий', `<input name="comment" value="${esc(d.comment)}" placeholder="необязательно">`)}
       </div>
     </div>
@@ -196,6 +213,22 @@ function materialRow(state, m, i, choices) {
   </div>`;
 }
 
+function ownerSplitHtml(state, d, full, contribution) {
+  const purpose = state.purposes.find((p) => p.id === d.purposeId);
+  if (purpose?.group !== 'business' || !full) return '';
+  const q = qtyOf(d);
+  const unit = full / q;
+  const o = { qty: q, ownerShare: d.ownerShare, unitPrice: C.ownerUnitPrice(unit, d.ownerPriceMode, d.ownerPrice) };
+  const r = C.ownerResult(o, unit, contribution / q);
+  const line = (l, v, cls = '') => `<div class="sum-line ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  return `<div class="split-box">
+    ${line('Цена для Merino Home', `${money(r.price)} × ${q}`)}
+    ${line(`Собственнику ${nf(r.share * 100, 1)} %`, money(r.owner))}
+    ${line(`Ваша доля ${nf(100 - r.share * 100, 1)} %`, money(r.mine))}
+    ${line('Ваша прибыль', `<span class="${r.profit < 0 ? 'neg' : 'pos'}">${money(r.profit)}</span>`, 'subtotal')}
+  </div>`;
+}
+
 export function summaryHtml(state, d) {
   const preview = previewCost(state, draftToPrint(d));
   const t = preview.totals;
@@ -209,7 +242,8 @@ export function summaryHtml(state, d) {
     ${preview.charges.filter((c) => c.kind === 'electricity' || c.kind === 'extra').map((c) => line(c.label, c.amount)).join('')}
     ${line('Прямая', t.direct, 'subtotal')}
     ${preview.charges.filter((c) => c.kind === 'amortization' || c.kind === 'ops').map((c) => line(c.label, c.amount)).join('')}
-    <div class="total-box"><span>Полная себестоимость</span><b>${money(t.full)}</b><small>${money(t.full / qty)} за 1 шт. · ${qty} шт.</small></div>`;
+    <div class="total-box"><span>Полная себестоимость</span><b>${money(t.full)}</b><small>${money(t.full / qty)} за 1 шт. · ${qty} шт.</small></div>
+    ${ownerSplitHtml(state, d, t.full, t.direct + t.ops)}`;
 }
 
 // Обновляет итог и «останется на катушке» без перерисовки формы (чтобы не терять курсор).
@@ -256,7 +290,7 @@ export function onDraftInput(state, target) {
     return 'rerender';
   } else if (name in d) {
     d[name] = target.value;
-    if (name === 'purposeId') return 'rerender';
+    if (name === 'purposeId' || name === 'ownerPriceMode') return 'rerender';
   }
   return 'live';
 }
@@ -297,6 +331,9 @@ const draftForm = (d) => {
   qty: d.qty,
   purposeId: d.purposeId,
   analogPrice: d.analogPrice,
+  ownerShare: d.ownerShare,
+  ownerPriceMode: d.ownerPriceMode,
+  ownerPrice: d.ownerPrice,
   comment: d.comment,
   materials: tot.materials.filter((m) => m.spoolId && m.grams > 0),
   };

@@ -68,7 +68,7 @@ export function emptyState() {
     version: 1,
     demo: false,
     setupDone: false,
-    settings: { currency: '₽', tariff: 7, printerW: 150, extraW: 0, lowStockG: 150, mpFee: 15, packCost: 30 },
+    settings: { currency: '₽', tariff: 7, printerW: 150, extraW: 0, lowStockG: 150, mpFee: 15, packCost: 30, ownerShare: 70 },
     purposes: DEFAULT_PURPOSES.map((p) => ({ ...p })),
     equipment: [],
     spools: [],
@@ -382,6 +382,9 @@ export function startPrint(state, f) {
     inputMode: f.inputMode === 'unit' ? 'unit' : 'total',
     purposeId: f.purposeId,
     analogPrice: C.num(f.analogPrice) || null,
+    ownerShare: f.ownerShare !== undefined && f.ownerShare !== '' ? C.num(f.ownerShare) : null,
+    ownerPriceMode: f.ownerPriceMode || 'm100',
+    ownerPrice: C.num(f.ownerPrice) || null,
     materials: f.materials,
     comment: f.comment || '',
     photoIds: f.photoIds || [],
@@ -407,6 +410,9 @@ export function finalizePrint(state, f) {
     qty: f.qty !== undefined ? Math.max(1, Math.round(C.num(f.qty))) : p.qty,
     purposeId: f.purposeId ?? p.purposeId,
     analogPrice: f.analogPrice !== undefined ? C.num(f.analogPrice) || null : p.analogPrice,
+    ownerShare: f.ownerShare !== undefined && f.ownerShare !== '' ? C.num(f.ownerShare) : p.ownerShare,
+    ownerPriceMode: f.ownerPriceMode || p.ownerPriceMode || 'm100',
+    ownerPrice: f.ownerPrice !== undefined ? C.num(f.ownerPrice) || null : p.ownerPrice,
     materials: f.materials ?? p.materials,
     comment: f.comment ?? p.comment,
   });
@@ -420,7 +426,11 @@ export function finalizePrint(state, f) {
   p.split = C.splitByQuality(cost.totals.full, cost.totals.direct + cost.totals.ops, p.qty, goodQty);
   p.status = status;
   p.failureReason = status === 'done' ? '' : f.failureReason || '';
-  p.outputs = goodQty > 0 ? [{ purposeId: p.purposeId, qty: goodQty, analogPrice: purposeGroupOf(state, p.purposeId) === 'business' ? p.analogPrice : null }] : [];
+  const isBiz = purposeGroupOf(state, p.purposeId) === 'business';
+  // Merino Home: доля собственника (к возмещению) фиксируется в печати вместе с себестоимостью.
+  const share = isBiz ? Math.max(0, Math.min(100, p.ownerShare ?? C.num(state.settings.ownerShare))) : 0;
+  const unitPrice = share ? C.ownerUnitPrice(p.split.unit, p.ownerPriceMode, p.ownerPrice) : null;
+  p.outputs = goodQty > 0 ? [{ purposeId: p.purposeId, qty: goodQty, analogPrice: isBiz ? p.analogPrice : null, ownerShare: share || null, unitPrice }] : [];
   p.snapshot = {
     at: new Date().toISOString(),
     tariff: state.settings.tariff,
@@ -438,6 +448,20 @@ export function finalizePrint(state, f) {
 
 const purposeGroupOf = (state, id) => state.purposes.find((x) => x.id === id)?.group || 'other';
 export const modelName = (state, id) => state.models.find((m) => m.id === id)?.name || 'Без названия';
+
+/** Меняет цену и долю собственника для изделий Merino Home в завершённой печати. */
+export function setOwnerPrice(state, printId, { mode, price, share }) {
+  const p = state.prints.find((x) => x.id === printId);
+  if (!p || !p.finalized) return;
+  p.ownerPriceMode = mode;
+  p.ownerPrice = mode === 'own' ? C.num(price) || null : null;
+  if (share !== undefined && share !== '') p.ownerShare = Math.max(0, Math.min(100, C.num(share)));
+  for (const o of p.outputs || []) {
+    if (purposeGroupOf(state, o.purposeId) !== 'business') continue;
+    if (share !== undefined && share !== '') o.ownerShare = p.ownerShare || null;
+    o.unitPrice = C.ownerUnitPrice(p.split.unit, mode, price);
+  }
+}
 
 export function deletePrint(state, id) {
   const p = state.prints.find((x) => x.id === id);
@@ -477,7 +501,7 @@ export function recordSale(state, f) {
     if (!take) continue;
     o.qty -= take;
     need -= take;
-    movedFrom.push({ purposeId: o.purposeId, qty: take, analogPrice: o.analogPrice });
+    movedFrom.push({ ...o, qty: take });
   }
   p.outputs = p.outputs.filter((o) => o.qty > 0);
   const moved = movedFrom.reduce((a, m) => a + m.qty, 0);
