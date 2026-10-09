@@ -1,5 +1,6 @@
 // Каркас: маршруты, разметка страницы, обработка нажатий и форм.
 import { store, photos } from './store.js';
+import { filming, apply as applyFilming } from './filming.js';
 import { ctx, esc, icon, closeModal, formData, toast } from './ui.js';
 import { renderHome } from './views/home.js';
 import { renderPrints, renderPrint, printActions, printForms, salePreview, attachPhoto } from './views/prints.js';
@@ -41,6 +42,7 @@ const VIEWS = {
 const actions = { ...syncActions, ...printActions, ...newPrintActions, ...catalogActions, ...spoolActions, ...moreActions,
   period: (el) => { ctx.ui.period = el.dataset.v; render(); },
   'modal-close': () => closeModal(),
+  film: () => { filming.set(!filming.on); toast(filming.on ? 'Режим съёмки: суммы скрыты' : 'Суммы снова видны'); },
 };
 const forms = { ...syncForms, ...printForms, ...newPrintForms, ...catalogForms, ...spoolForms, ...moreForms };
 
@@ -70,6 +72,7 @@ function render() {
     <header class="topbar">
       <div class="brand"><a href="#/home" class="logo" aria-label="Главная">3D</a><span><a href="#/home"><b>Мастерская 3D</b></a><span id="sync-pill">${syncPill()}</span></span></div>
       <nav class="nav" aria-label="Разделы">${NAV.map(([k, l]) => `<a href="#/${k}" class="${k === section ? 'on' : ''}">${l}</a>`).join('')}</nav>
+      <button class="film-btn" data-act="film" aria-pressed="${filming.on}" title="Режим съёмки: скрыть суммы">${icon.camera(18)}<span>Съёмка</span></button>
       <a class="btn primary new-btn" href="#/new">${icon.plus(18)} Новая печать</a>
     </header>
     <main class="wrap">${content}</main>
@@ -83,6 +86,7 @@ function render() {
   lastKey = route.key;
   if (route.name === 'new') refreshLive(state);
   loadPhotos();
+  applyFilming();
 }
 
 const photoUrls = new Map();

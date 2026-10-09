@@ -79,7 +79,7 @@ export function renderHome(state) {
       <div class="tile grad-purple"><span>Выручка</span><b>${money0(earn.revenue)}</b><small>продажи ${money0(dSales.revenue)} · Merino Home ${money0(own.revenue)}</small></div>
       <div class="tile mint"><span>Прибыль</span><b>${money0(earn.profit)}</b><small>продажи ${money0(dSales.profit)} · Merino Home ${money0(own.profit)}</small></div>
       <div class="tile"><span>Продано</span><b>${dSales.qty} шт.</b><small>${dSales.count} ${plural(dSales.count, 'сделка', 'сделки', 'сделок')}${own.qty ? ` · Merino Home ${own.qty} шт.` : ''}</small></div>
-      <div class="tile"><span>Маржа</span><b>${earn.revenue ? Math.round((earn.profit / earn.revenue) * 100) : 0} %</b><small>прибыль ÷ выручка</small></div>
+      <div class="tile"><span>Маржа</span><b class="m-all">${earn.revenue ? Math.round((earn.profit / earn.revenue) * 100) : 0} %</b><small>прибыль ÷ выручка</small></div>
     </div>
     ${dSales.list.length ? `<div class="table-scroll"><div class="sales-list">${dSales.list.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((s) => `
       <a class="sale-row" href="#/print/${s.printId}">

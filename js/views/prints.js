@@ -129,7 +129,7 @@ function priceAndSale(state, p, sellable, sales) {
   const unit = p.split.unit;
   const o = C.priceOptions(unit, state.settings);
   const fee = state.settings.mpFee, pack = state.settings.packCost;
-  const opt = (label, note, price) => `<button type="button" class="price-opt" data-act="price-pick" data-v="${price}"><span class="row-between"><b>${label}</b><b class="h3">${money(price)}</b></span><span class="row-between small muted"><span>${note}</span><span class="pos fw700">+${money(price - unit)} · ${Math.round(((price - unit) / price) * 100)} %</span></span></button>`;
+  const opt = (label, note, price) => `<button type="button" class="price-opt" data-act="price-pick" data-v="${price}"><span class="row-between"><b>${label}</b><b class="h3">${money(price)}</b></span><span class="row-between small muted"><span>${note}</span><span class="pos fw700 m-all">+${money(price - unit)} · ${Math.round(((price - unit) / price) * 100)} %</span></span></button>`;
   return `<div class="card stack-12">
     <div class="h3">Цена продажи <span class="muted small">за 1 шт.</span></div>
     ${sellable ? `
