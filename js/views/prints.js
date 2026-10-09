@@ -3,6 +3,7 @@ import * as C from '../calc.js';
 import { store, today, modelName, deletePrint, recordSale, deleteSale, sellableQty, photos, spoolLabel, uid } from '../store.js';
 import { ctx, esc, money, money0, grams, nf, hoursText, dateText, dateShort, icon, chip, purposeChip, STATUS, GROUP_STYLE, pageHead, emptyBox, field, numInput, toast, photoImg, compressImage } from '../ui.js';
 import { printRow } from './home.js';
+import { queuePhoto } from '../sync.js';
 import { openFinishModal, openFailureModal } from './newprint.js';
 
 const FILTERS = [['all', 'Все'], ['done', 'Успешные'], ['failed', 'Брак'], ['printing', 'Печатаются'], ['sellable', 'Можно продать']];
@@ -205,6 +206,7 @@ export async function attachPhoto(target, file) {
   const blob = await compressImage(file);
   const photoId = 'ph_' + uid();
   await photos.put(photoId, blob);
+  queuePhoto(photoId);
   store.commit((s) => {
     if (type === 'print') {
       const p = s.prints.find((x) => x.id === id);

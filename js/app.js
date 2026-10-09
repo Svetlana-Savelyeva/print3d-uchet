@@ -6,6 +6,8 @@ import { renderPrints, renderPrint, printActions, printForms, salePreview, attac
 import { renderNewPrint, initDraft, newPrintActions, newPrintForms, onDraftInput, refreshLive } from './views/newprint.js';
 import { renderCatalog, renderModel, catalogActions, catalogForms } from './views/catalog.js';
 import { renderSpools, renderSpool, spoolActions, spoolForms } from './views/spools.js';
+import { renderSync, syncActions, syncForms, syncPill, paintSyncPill } from './views/syncview.js';
+import { sync, startSync, fetchPhoto } from './sync.js';
 import { renderMore, renderEquipment, renderConsumables, renderPurchases, renderSettings, renderBackup, renderSetup, moreActions, moreForms, moreChange } from './views/more.js';
 
 const NAV = [
@@ -15,7 +17,7 @@ const NAV = [
   ['spools', 'Филаменты', icon.spool],
   ['more', 'Ещё', icon.more],
 ];
-const SECTION = { print: 'prints', new: 'new', model: 'models', spool: 'spools', equipment: 'more', consumables: 'more', purchases: 'more', settings: 'more', backup: 'more' };
+const SECTION = { print: 'prints', new: 'new', model: 'models', spool: 'spools', equipment: 'more', consumables: 'more', purchases: 'more', settings: 'more', backup: 'more', sync: 'more' };
 
 const VIEWS = {
   home: renderHome,
@@ -33,13 +35,14 @@ const VIEWS = {
   settings: renderSettings,
   backup: renderBackup,
   setup: renderSetup,
+  sync: renderSync,
 };
 
-const actions = { ...printActions, ...newPrintActions, ...catalogActions, ...spoolActions, ...moreActions,
+const actions = { ...syncActions, ...printActions, ...newPrintActions, ...catalogActions, ...spoolActions, ...moreActions,
   period: (el) => { ctx.ui.period = el.dataset.v; render(); },
   'modal-close': () => closeModal(),
 };
-const forms = { ...printForms, ...newPrintForms, ...catalogForms, ...spoolForms, ...moreForms };
+const forms = { ...syncForms, ...printForms, ...newPrintForms, ...catalogForms, ...spoolForms, ...moreForms };
 
 function parseRoute() {
   const raw = location.hash.replace(/^#\/?/, '') || 'home';
@@ -53,7 +56,7 @@ let lastKey = '';
 function render() {
   const state = store.state;
   let route = parseRoute();
-  if (!state.setupDone && route.name !== 'setup') { location.replace('#/setup'); return; }
+  if (!state.setupDone && route.name !== 'setup' && route.name !== 'sync') { location.replace('#/setup'); return; }
   if (route.name === 'new' && (!ctx.ui.draft || ctx.ui.draftKey !== route.key)) {
     ctx.ui.draft = initDraft(state, route.query);
     ctx.ui.draftKey = route.key;
@@ -63,9 +66,10 @@ function render() {
   const app = document.getElementById('app');
   const keepScroll = route.key === lastKey;
   const y = window.scrollY;
-  app.innerHTML = route.name === 'setup' ? `<main class="wrap">${content}</main>` : `
+  app.innerHTML = route.name === 'setup' || (route.name === 'sync' && !state.setupDone) ? `<main class="wrap">${content}</main>` : `
     <header class="topbar">
       <a class="brand" href="#/home"><span class="logo">3D</span><span><b>Мастерская 3D</b><small>Учёт печати и себестоимости</small></span></a>
+      <span id="sync-pill">${syncPill()}</span>
       <nav class="nav" aria-label="Разделы">${NAV.map(([k, l]) => `<a href="#/${k}" class="${k === section ? 'on' : ''}">${l}</a>`).join('')}</nav>
       <a class="btn primary new-btn" href="#/new">${icon.plus(18)} Новая печать</a>
     </header>
@@ -87,7 +91,8 @@ async function loadPhotos() {
   for (const img of document.querySelectorAll('img[data-photo]')) {
     const id = img.dataset.photo;
     if (!photoUrls.has(id)) {
-      const blob = await photos.get(id);
+      let blob = await photos.get(id);
+      if (!blob) blob = await fetchPhoto(id).catch(() => null);
       if (!blob) continue;
       photoUrls.set(id, URL.createObjectURL(blob));
     }
@@ -158,6 +163,8 @@ ctx.go = (hash) => { if (location.hash === hash) render(); else location.hash = 
     store.state = emptyState();
   }
   store.listeners.add(render);
+  sync.listeners.add(() => { paintSyncPill(); if (parseRoute().name === 'sync') render(); });
   render();
+  startSync();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 })();

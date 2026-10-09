@@ -2,6 +2,7 @@
 import * as C from '../calc.js';
 import { store, today, emptyState, addEquipment, updateEquipment, addConsumable, retireConsumable, addPurchase, photos, modelName, spoolLabel } from '../store.js';
 import { buildDemo } from '../demo.js';
+import { getConfig } from '../sync.js';
 import { ctx, esc, money, money0, nf, dateText, dateShort, icon, chip, GROUP_STYLE, pageHead, emptyBox, field, numInput, selectEl, openModal, closeModal, modalHead, toast } from '../ui.js';
 
 export function renderMore(state) {
@@ -12,6 +13,7 @@ export function renderMore(state) {
     ${tile('#/equipment', icon.printer(20), 'Оборудование', `${state.equipment.length} шт. · амортизация`)}
     ${tile('#/consumables', icon.box(20), 'Расходники', 'сопла, клей, силикагель')}
     ${tile('#/purchases', icon.receipt(20), 'Покупки', `всего вложено ${money0(state.purchases.reduce((a, p) => a + p.amount, 0))}`)}
+    ${tile('#/sync', icon.repeat(20), 'Синхронизация', getConfig() ? 'телефон и компьютер — общие данные' : 'включить общие данные для телефона и компьютера')}
     ${tile('#/settings', icon.gear(20), 'Настройки', 'тариф, мощность, комиссия')}
     ${tile('#/backup', icon.download(20), 'Резервная копия', 'сохранить, восстановить, Excel')}
   </div>
@@ -210,6 +212,7 @@ export function renderSetup(state) {
       <h1>Учёт 3D-печати</h1>
       <p class="muted">Себестоимость каждой печати, склад филамента, продажи и окупаемость принтера. Данные хранятся в этом браузере.</p>
       <button class="btn soft big" data-act="reset-demo">Сначала посмотреть на демо-данных</button>
+      <a class="btn ghost big" href="#/sync">Уже веду учёт на другом устройстве — подключить синхронизацию</a>
     </div>
     <form class="card stack-12" data-form="setup">
       <div class="h2">Или начать со своих данных</div>
@@ -284,13 +287,15 @@ export const moreActions = {
     toast('Копия скачана');
   },
   'reset-empty': async () => {
-    const msg = store.state.demo ? 'Удалить демо-данные и начать со своих?' : 'Удалить ВСЕ данные? Это нельзя отменить без резервной копии.';
+    const cloud = getConfig() ? ' Синхронизация включена: данные удалятся и в облаке, и на всех устройствах.' : '';
+    const msg = (store.state.demo ? 'Удалить демо-данные и начать со своих?' : 'Удалить ВСЕ данные? Это нельзя отменить без резервной копии.') + cloud;
     if (!confirm(msg)) return;
     await photos.clear();
     await store.replace(emptyState());
     ctx.go('#/setup');
   },
   'reset-demo': async () => {
+    if (getConfig()) return toast('Сначала отключите синхронизацию, чтобы демо-данные не попали в облако', 'err');
     if (store.state.setupDone && !store.state.demo && !confirm('Заменить ваши данные демо-данными? Сначала скачайте копию.')) return;
     await photos.clear();
     await store.replace(buildDemo());

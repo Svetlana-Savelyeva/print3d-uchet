@@ -30,6 +30,11 @@ async function idb(storeName, mode, fn) {
     tx.onerror = () => reject(tx.error);
   });
 }
+export const kv = {
+  get: (key) => idb('kv', 'readonly', (s) => s.get(key)),
+  put: (key, value) => idb('kv', 'readwrite', (s) => s.put(value, key)),
+  del: (key) => idb('kv', 'readwrite', (s) => s.delete(key)),
+};
 export const photos = {
   put: (id, blob) => idb('photos', 'readwrite', (s) => s.put(blob, id)),
   get: (id) => idb('photos', 'readonly', (s) => s.get(id)),
@@ -108,7 +113,7 @@ export const store = {
   },
 };
 
-function migrate(s) {
+export function migrate(s) {
   const base = emptyState();
   return { ...base, ...s, settings: { ...base.settings, ...(s.settings || {}) } };
 }
