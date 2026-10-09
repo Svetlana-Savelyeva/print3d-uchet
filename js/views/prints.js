@@ -29,7 +29,7 @@ export function renderPrints(state, route) {
   </div>
   ${filter === 'sellable' ? '<div class="note">Выберите печать — в её карточке есть цена и кнопка «Подтвердить продажу».</div>' : ''}
   ${list.length ? `<div class="card flush"><div class="table-scroll"><div class="ptable">
-    <div class="pt-head with-del"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right">Полная</span></div>
+    <div class="pt-head with-del"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right" title="Полная себестоимость: пластик, электричество, износ принтера и расходники">Себестоимость</span></div>
     ${list.map((p) => printRow(state, p, true)).join('')}
   </div></div></div>` : emptyBox('Здесь пока пусто.')}`;
 }

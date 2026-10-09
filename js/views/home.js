@@ -133,7 +133,7 @@ export function renderHome(state) {
     <div class="card flush" style="flex:999 1 560px;min-width:0">
       <div class="h3 pad">Последние печати</div>
       ${recent.length ? `<div class="table-scroll"><div class="ptable">
-        <div class="pt-head"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right">Полная</span></div>
+        <div class="pt-head"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right" title="Полная себестоимость: пластик, электричество, износ принтера и расходники">Себестоимость</span></div>
         ${recent.map((p) => printRow(state, p)).join('')}
       </div></div>` : '<div class="pad muted">Пока ни одной печати. Нажмите «Новая печать».</div>'}
     </div>
@@ -148,7 +148,7 @@ export function printRow(state, p, withDelete = false) {
     <span><b>${esc(modelName(state, p.modelId))}</b> <span class="muted">· ${p.qty} шт.</span></span>
     <span>${purpose}</span>
     <span>${chip(st.label, st)}</span>
-    <b class="right">${p.finalized ? money(p.totals.full) : '—'}</b>
+    <span class="right cost-cell">${p.finalized ? `<b>${money(p.totals.full)}</b>${p.qty > 1 && p.split.good ? `<small class="muted">${money(p.split.unit)} за шт.</small>` : ''}` : '<b>—</b>'}</span>
   </a>`;
   if (!withDelete) return row;
   return `<div class="pt-wrap">${row}<button class="icon-btn del-btn" data-act="delete-print" data-id="${p.id}" aria-label="Удалить печать" title="Удалить">${icon.trash(17)}</button></div>`;

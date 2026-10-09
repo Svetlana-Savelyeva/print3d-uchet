@@ -68,7 +68,7 @@ export function renderModel(state, route) {
       </div>
       <div class="card flush">
         <div class="h3 pad">История печатей</div>
-        ${prints.length ? `<div class="table-scroll"><div class="ptable"><div class="pt-head"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right">Полная</span></div>${prints.map((p) => printRow(state, p)).join('')}</div></div>` : '<div class="pad muted">Ещё не печаталась</div>'}
+        ${prints.length ? `<div class="table-scroll"><div class="ptable"><div class="pt-head"><span>Дата</span><span>Изделие</span><span>Назначение</span><span>Статус</span><span class="right" title="Полная себестоимость: пластик, электричество, износ принтера и расходники">Себестоимость</span></div>${prints.map((p) => printRow(state, p)).join('')}</div></div>` : '<div class="pad muted">Ещё не печаталась</div>'}
       </div>
       ${variants(state, m.id).length ? `<div class="card stack-8"><div class="h3">Варианты исполнения</div><div class="row wrap gap8">${variants(state, m.id).map((v) => `<span class="var-chip"><i style="background:${esc(v.hex)}"></i>${esc(v.label)}</span>`).join('')}</div></div>` : ''}
       ${gallery.length ? `<div class="card stack-8"><div class="h3">Фото печатей</div><div class="gallery">${gallery.map((id) => photoImg(id, 'gal')).join('')}</div></div>` : ''}

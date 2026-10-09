@@ -362,3 +362,5 @@ label.price-opt { cursor: pointer; }
 label.price-opt input[name="price"] { margin-top: 6px; }
 .sale-details summary { cursor: pointer; font-weight: 700; color: var(--ink2); }
 .sale-details[open] summary { margin-bottom: 14px; }
+.cost-cell { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.cost-cell small { font-size: 12px; }
