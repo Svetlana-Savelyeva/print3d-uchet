@@ -3,7 +3,21 @@ import * as C from '../calc.js';
 import { store, today, printers, previewCost, finalizePrint, startPrint, modelName, FAILURE_REASONS, spoolLabel } from '../store.js';
 import { ctx, esc, money, grams, nf, hoursText, icon, swatch, field, numInput, selectEl, openModal, closeModal, modalHead, toast, formData, GROUP_STYLE } from '../ui.js';
 
-const ROLES = Object.entries(C.ROLE_LABELS);
+const ROLES = [['model', 'Изделие'], ['support', 'Supports'], ['purge', 'Purge'], ['tower', 'Prime tower'], ['waste', 'Отходы']];
+const MODE_KEY = 'p3d-input-mode';
+const savedMode = () => { try { return localStorage.getItem(MODE_KEY) === 'total' ? 'total' : 'unit'; } catch { return 'unit'; } };
+
+/** Часы: «4,5», «0,5» или «1:30» (часы:минуты). */
+export function parseHours(v) {
+  const s = String(v ?? '').trim();
+  const m = s.match(/^(\d+)\s*[:.ч]\s*(\d{1,2})\s*(мин)?$/);
+  if (m && s.includes(':')) return Number(m[1]) + Number(m[2]) / 60;
+  return C.num(s);
+}
+const qtyOf = (d) => Math.max(1, Math.round(C.num(d.qty) || 1));
+/** Множитель: в режиме «за 1 шт.» граммы, часы и доп. расходы умножаются на количество. */
+const factor = (d) => (d.inputMode === 'unit' ? qtyOf(d) : 1);
+const fmt = (n) => String(C.round2(n)).replace('.', ',');
 
 export function spoolChoices(state, includeId) {
   return state.spools
@@ -31,6 +45,7 @@ export function initDraft(state, query) {
     date: today(),
     hours: '',
     qty: '1',
+    inputMode: savedMode(),
     purposeId: 'business',
     analogPrice: '',
     extraCost: '',
@@ -52,31 +67,38 @@ export function initDraft(state, query) {
     draft.purposeId = model.defaultPurpose || 'business';
   }
   if (base) {
+    const mode = base.inputMode || draft.inputMode;
+    const k = mode === 'unit' ? Math.max(1, base.qty) : 1;
     Object.assign(draft, {
+      inputMode: mode,
       printerId: state.equipment.some((e) => e.id === base.printerId) ? base.printerId : draft.printerId,
-      hours: String(base.hours).replace('.', ','),
+      hours: fmt(base.hours / k),
+      extraCost: base.extraCost ? fmt(base.extraCost / k) : '',
       qty: String(base.qty),
       purposeId: base.purposeId || draft.purposeId,
       analogPrice: base.analogPrice ? String(base.analogPrice) : '',
       materials: base.materials.map((m) => ({
         spoolId: pickSpool(state, state.spools.find((s) => s.id === m.spoolId), m.grams),
         role: m.role,
-        grams: String(m.grams).replace('.', ','),
+        grams: fmt(m.grams / k),
       })),
     });
   }
   return draft;
 }
 
-export const draftToPrint = (d) => ({
-  id: d.printId,
-  printerId: d.printerId,
-  date: d.date,
-  hours: C.num(d.hours),
-  kwhActual: C.num(d.kwhActual) || null,
-  extraCost: C.num(d.extraCost),
-  materials: d.materials.map((m) => ({ spoolId: m.spoolId, role: m.role, grams: C.num(m.grams) })),
-});
+export const draftToPrint = (d) => {
+  const k = factor(d);
+  return {
+    id: d.printId,
+    printerId: d.printerId,
+    date: d.date,
+    hours: C.round2(parseHours(d.hours) * k),
+    kwhActual: C.num(d.kwhActual) || null,
+    extraCost: C.round2(C.num(d.extraCost) * k),
+    materials: d.materials.map((m) => ({ spoolId: m.spoolId, role: m.role, grams: C.round2(C.num(m.grams) * k) })),
+  };
+};
 
 export function renderNewPrint(state) {
   const d = ctx.ui.draft;
@@ -103,22 +125,30 @@ export function renderNewPrint(state) {
         <div class="grid3">
           ${field('Принтер', ps.length ? selectEl('printerId', ps.map((p) => [p.id, p.name]), d.printerId) : '<div class="muted small">Добавьте принтер в «Ещё → Оборудование»</div>')}
           ${field('Дата', `<input type="date" name="date" value="${esc(d.date)}">`)}
-          ${field('Изделий, шт.', numInput('qty', d.qty, 'inputmode="numeric"'))}
         </div>
       </div>
 
       <div class="card stack-12">
-        <div class="step"><span>2</span>Катушки и граммы <small class="muted">из слайсера</small></div>
+        <div class="step"><span>2</span>Сколько и из чего</div>
+        <div class="mode-row">
+          <div class="mode-toggle" role="radiogroup" aria-label="Как вводить граммы и время">
+            <label><input type="radio" name="inputMode" value="unit" ${d.inputMode === 'unit' ? 'checked' : ''}><span>За 1 шт.</span></label>
+            <label><input type="radio" name="inputMode" value="total" ${d.inputMode === 'total' ? 'checked' : ''}><span>За всю печать</span></label>
+          </div>
+          <label class="qty-field"><span>Напечатано, шт.</span>${numInput('qty', d.qty, 'inputmode="numeric" aria-label="Сколько штук напечатано"')}</label>
+        </div>
+        <p class="muted small mode-hint">${d.inputMode === 'unit' ? 'Граммы и время — на <b>одно изделие</b>. Приложение умножит их на количество.' : 'Граммы и время — на <b>всю печать</b> целиком, как в слайсере для всего стола.'}</p>
         ${!choices.length ? '<div class="warn">На складе нет катушек. <a href="#/spools">Добавьте филамент</a>, чтобы списывать материал.</div>' : ''}
         ${d.materials.map((m, i) => materialRow(state, m, i, choices)).join('')}
         <div class="row wrap gap8">
           <button type="button" class="btn ghost small" data-act="np-add-row">${icon.plus(16)} Ещё катушка или отходы</button>
         </div>
         <div class="grid3">
-          ${field('Время печати, ч', numInput('hours', d.hours, 'placeholder="например, 4,5"'), 'можно дробью: 1,75 ч = 1 ч 45 мин')}
-          ${field('Факт кВт·ч', numInput('kwhActual', d.kwhActual, 'placeholder="если есть счётчик"'), 'заменит расчёт по мощности')}
-          ${field('Доп. прямые расходы, ₽', numInput('extraCost', d.extraCost, 'placeholder="магниты, вставки…"'))}
+          ${field(d.inputMode === 'unit' ? 'Время на 1 шт., ч' : 'Время всей печати, ч', numInput('hours', d.hours, `placeholder="${d.inputMode === 'unit' ? 'например, 0,5' : 'например, 4,5'}"`), '0,5 = 30 мин · можно «1:30»')}
+          ${field(d.inputMode === 'unit' ? 'Доп. расходы на 1 шт., ₽' : 'Доп. расходы на всё, ₽', numInput('extraCost', d.extraCost, 'placeholder="магниты, вставки…"'))}
+          ${field('Факт кВт·ч за всю печать', numInput('kwhActual', d.kwhActual, 'placeholder="если есть счётчик"'), 'заменит расчёт по мощности')}
         </div>
+        <div class="totals-line" id="np-totals"></div>
       </div>
 
       <div class="card stack-12">
@@ -159,7 +189,7 @@ function materialRow(state, m, i, choices) {
     <div class="mat-fields">
       ${selectEl(`m-spool-${i}`, opts, m.spoolId, 'aria-label="Катушка" class="mat-spool"')}
       ${selectEl(`m-role-${i}`, ROLES, m.role, 'aria-label="Для чего материал" class="mat-role"')}
-      <span class="mat-g">${numInput(`m-grams-${i}`, m.grams, 'placeholder="г" aria-label="Граммы"')}<em>г</em></span>
+      <span class="mat-g">${numInput(`m-grams-${i}`, m.grams, 'placeholder="0" aria-label="Граммы"')}<em>г</em></span>
     </div>
     <span class="mat-left small" id="np-left-${i}"></span>
     ${i > 0 ? `<button type="button" class="icon-btn" data-act="np-del-row" data-i="${i}" aria-label="Убрать строку">${icon.close(16)}</button>` : ''}
@@ -169,7 +199,7 @@ function materialRow(state, m, i, choices) {
 export function summaryHtml(state, d) {
   const preview = previewCost(state, draftToPrint(d));
   const t = preview.totals;
-  const qty = Math.max(1, Math.round(C.num(d.qty) || 1));
+  const qty = qtyOf(d);
   const roleSum = {};
   for (const m of preview.materials) roleSum[m.role] = (roleSum[m.role] || 0) + m.amount;
   const line = (l, v, cls = '') => `<div class="sum-line ${cls}"><span>${l}</span><b>${money(v)}</b></div>`;
@@ -188,12 +218,22 @@ export function refreshLive(state) {
   const el = document.getElementById('np-summary');
   if (el) el.innerHTML = summaryHtml(state, d);
   const need = {};
-  d.materials.forEach((m) => (need[m.spoolId] = (need[m.spoolId] || 0) + C.num(m.grams)));
+  const k = factor(d);
+  d.materials.forEach((m) => (need[m.spoolId] = (need[m.spoolId] || 0) + C.num(m.grams) * k));
+  const tl = document.getElementById('np-totals');
+  if (tl) {
+    const g = d.materials.reduce((a, m) => a + C.num(m.grams), 0);
+    const h = parseHours(d.hours);
+    tl.innerHTML = d.inputMode === 'unit' && (g || h)
+      ? `Всего на ${k} шт.: <b>${grams(g * k)}</b> пластика${h ? ` · <b>${hoursText(h * k)}</b> печати` : ''}${h ? ` <span class="muted">(${hoursText(h)} × ${k})</span>` : ''}`
+      : d.inputMode === 'total' && qtyOf(d) > 1 && g ? `На 1 шт.: <b>${nf(g / qtyOf(d), 1)} г</b>${h ? ` · <b>${hoursText(h / qtyOf(d))}</b>` : ''}` : '';
+  }
   d.materials.forEach((m, i) => {
     const out = document.getElementById(`np-left-${i}`);
     const s = state.spools.find((x) => x.id === m.spoolId);
     if (!out || !s) return;
     const after = C.round2(C.spoolStats(s, state.movements).left - need[m.spoolId]);
+    if (i !== d.materials.findIndex((x) => x.spoolId === m.spoolId)) { out.innerHTML = ''; return; }
     out.innerHTML = C.num(m.grams) > 0 ? (after >= 0 ? `<span class="pos">останется ${grams(after)}</span>` : `<span class="neg">не хватит ${grams(-after)}</span>`) : '';
   });
 }
@@ -210,11 +250,26 @@ export function onDraftInput(state, target) {
     d.modelName = target.value;
     const m = state.models.find((x) => x.name.toLowerCase() === target.value.trim().toLowerCase());
     d.modelId = m ? m.id : '';
+  } else if (name === 'inputMode') {
+    switchMode(d, target.value);
+    try { localStorage.setItem(MODE_KEY, d.inputMode); } catch { /* не критично */ }
+    return 'rerender';
   } else if (name in d) {
     d[name] = target.value;
     if (name === 'purposeId') return 'rerender';
   }
   return 'live';
+}
+
+// При переключении режима пересчитываем уже введённые числа, чтобы итог не изменился.
+function switchMode(d, mode) {
+  if (mode === d.inputMode) return;
+  const q = qtyOf(d);
+  const conv = (v) => (String(v).trim() === '' ? v : fmt(mode === 'unit' ? C.num(v) / q : C.num(v) * q));
+  d.materials.forEach((m) => (m.grams = conv(m.grams)));
+  if (String(d.hours).trim() !== '') d.hours = fmt(mode === 'unit' ? parseHours(d.hours) / q : parseHours(d.hours) * q);
+  d.extraCost = conv(d.extraCost);
+  d.inputMode = mode;
 }
 
 function validate(state, d, needMaterials = true) {
@@ -223,25 +278,29 @@ function validate(state, d, needMaterials = true) {
     const rows = d.materials.filter((m) => C.num(m.grams) > 0);
     if (!rows.length) return 'Укажите граммы материала';
     if (rows.some((m) => !m.spoolId)) return 'Выберите катушку';
-    if (!(C.num(d.hours) > 0) && !(C.num(d.kwhActual) > 0)) return 'Укажите время печати';
+    if (!(parseHours(d.hours) > 0) && !(C.num(d.kwhActual) > 0)) return 'Укажите время печати';
   }
   return '';
 }
 
-const draftForm = (d) => ({
+const draftForm = (d) => {
+  const tot = draftToPrint(d);
+  return {
   modelId: d.modelId,
   modelName: d.modelName,
   printerId: d.printerId,
   date: d.date,
-  hours: d.hours,
+  hours: tot.hours,
   kwhActual: d.kwhActual,
-  extraCost: d.extraCost,
+  extraCost: tot.extraCost,
+  inputMode: d.inputMode,
   qty: d.qty,
   purposeId: d.purposeId,
   analogPrice: d.analogPrice,
   comment: d.comment,
-  materials: d.materials.filter((m) => m.spoolId && C.num(m.grams) > 0).map((m) => ({ spoolId: m.spoolId, role: m.role, grams: C.num(m.grams) })),
-});
+  materials: tot.materials.filter((m) => m.spoolId && m.grams > 0),
+  };
+};
 
 export const newPrintActions = {
   'np-model': (el) => ctx.go(`#/new?model=${el.dataset.id}`),

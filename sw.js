@@ -1,5 +1,5 @@
 // Офлайн-режим: приложение открывается без интернета. Данные лежат в браузере и сюда не попадают.
-const CACHE = 'print3d-v3';
+const CACHE = 'print3d-v4';
 const FILES = [
   './', './index.html', './css/app.css', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png',
   './js/app.js', './js/calc.js', './js/store.js', './js/ui.js', './js/demo.js', './js/sync.js', './js/merge.js', './js/views/syncview.js',

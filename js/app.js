@@ -68,8 +68,7 @@ function render() {
   const y = window.scrollY;
   app.innerHTML = route.name === 'setup' || (route.name === 'sync' && !state.setupDone) ? `<main class="wrap">${content}</main>` : `
     <header class="topbar">
-      <a class="brand" href="#/home"><span class="logo">3D</span><span><b>Мастерская 3D</b><small>Учёт печати и себестоимости</small></span></a>
-      <span id="sync-pill">${syncPill()}</span>
+      <div class="brand"><a href="#/home" class="logo" aria-label="Главная">3D</a><span><a href="#/home"><b>Мастерская 3D</b></a><span id="sync-pill">${syncPill()}</span></span></div>
       <nav class="nav" aria-label="Разделы">${NAV.map(([k, l]) => `<a href="#/${k}" class="${k === section ? 'on' : ''}">${l}</a>`).join('')}</nav>
       <a class="btn primary new-btn" href="#/new">${icon.plus(18)} Новая печать</a>
     </header>

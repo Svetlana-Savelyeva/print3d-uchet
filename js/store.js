@@ -379,6 +379,7 @@ export function startPrint(state, f) {
     extraCost: C.num(f.extraCost) || 0,
     extraLabel: f.extraLabel || '',
     qty: Math.max(1, Math.round(C.num(f.qty) || 1)),
+    inputMode: f.inputMode === 'unit' ? 'unit' : 'total',
     purposeId: f.purposeId,
     analogPrice: C.num(f.analogPrice) || null,
     materials: f.materials,
