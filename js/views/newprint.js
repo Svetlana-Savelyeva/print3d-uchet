@@ -14,6 +14,24 @@ export function parseHours(v) {
   if (m && s.includes(':')) return Number(m[1]) + Number(m[2]) / 60;
   return C.num(s);
 }
+/** Два поля «ч» и «мин» вместо дробных часов. hours — десятичные часы. */
+export function timeFields(name, hours, label, hint = '') {
+  const total = Math.max(0, Math.round(C.num(hours) * 60));
+  const has = String(hours ?? '').trim() !== '' && C.num(hours) > 0;
+  const h = has ? Math.floor(total / 60) : '';
+  const m = has ? total % 60 : '';
+  return `<div class="field"><span>${label}</span><div class="time-pair">
+    <span class="tp">${numInput(`${name}_h`, h, 'inputmode="numeric" placeholder="0" aria-label="Часы"')}<em>ч</em></span>
+    <span class="tp">${numInput(`${name}_m`, m, 'inputmode="numeric" placeholder="0" aria-label="Минуты"')}<em>мин</em></span>
+  </div>${hint ? `<small>${hint}</small>` : ''}</div>`;
+}
+/** Читает часы из пары полей формы; пусто — ''. */
+export function readTime(f, name) {
+  const h = String(f[`${name}_h`] ?? '').trim();
+  const m = String(f[`${name}_m`] ?? '').trim();
+  if (h === '' && m === '') return '';
+  return C.num(h) + C.num(m) / 60;
+}
 const qtyOf = (d) => Math.max(1, Math.round(C.num(d.qty) || 1));
 /** Множитель: в режиме «за 1 шт.» граммы, часы и доп. расходы умножаются на количество. */
 const factor = (d) => (d.inputMode === 'unit' ? qtyOf(d) : 1);
@@ -75,7 +93,7 @@ export function initDraft(state, query) {
     Object.assign(draft, {
       inputMode: mode,
       printerId: state.equipment.some((e) => e.id === base.printerId) ? base.printerId : draft.printerId,
-      hours: fmt(base.hours / k),
+      hours: String(base.hours / k),
       extraCost: base.extraCost ? fmt(base.extraCost / k) : '',
       qty: String(base.qty),
       purposeId: base.purposeId || draft.purposeId,
@@ -99,7 +117,7 @@ export const draftToPrint = (d) => {
     id: d.printId,
     printerId: d.printerId,
     date: d.date,
-    hours: C.round2(parseHours(d.hours) * k),
+    hours: Math.round(parseHours(d.hours) * k * 10000) / 10000,
     kwhActual: C.num(d.kwhActual) || null,
     extraCost: C.round2(C.num(d.extraCost) * k),
     materials: d.materials.map((m) => ({ spoolId: m.spoolId, role: m.role, grams: C.round2(C.num(m.grams) * k) })),
@@ -150,7 +168,7 @@ export function renderNewPrint(state) {
           <button type="button" class="btn ghost small" data-act="np-add-row">${icon.plus(16)} Ещё катушка или отходы</button>
         </div>
         <div class="grid3">
-          ${field(d.inputMode === 'unit' ? 'Время на 1 шт., ч' : 'Время всей печати, ч', numInput('hours', d.hours, `placeholder="${d.inputMode === 'unit' ? 'например, 0,5' : 'например, 4,5'}"`), '0,5 = 30 мин · можно «1:30»')}
+          ${timeFields('hours', parseHours(d.hours), d.inputMode === 'unit' ? 'Время на 1 шт.' : 'Время всей печати', 'как в слайсере: например, 0 ч 49 мин')}
           ${field(d.inputMode === 'unit' ? 'Доп. расходы на 1 шт., ₽' : 'Доп. расходы на всё, ₽', numInput('extraCost', d.extraCost, 'placeholder="магниты, вставки…"'))}
           ${field('Факт кВт·ч за всю печать', numInput('kwhActual', d.kwhActual, 'placeholder="если есть счётчик"'), 'заменит расчёт по мощности')}
         </div>
@@ -284,6 +302,9 @@ export function onDraftInput(state, target) {
     d.modelName = target.value;
     const m = state.models.find((x) => x.name.toLowerCase() === target.value.trim().toLowerCase());
     d.modelId = m ? m.id : '';
+  } else if (name === 'hours_h' || name === 'hours_m') {
+    const v = readTime(formData(target.form), 'hours');
+    d.hours = v === '' ? '' : String(v);
   } else if (name === 'inputMode') {
     switchMode(d, target.value);
     try { localStorage.setItem(MODE_KEY, d.inputMode); } catch { /* не критично */ }
@@ -301,7 +322,7 @@ function switchMode(d, mode) {
   const q = qtyOf(d);
   const conv = (v) => (String(v).trim() === '' ? v : fmt(mode === 'unit' ? C.num(v) / q : C.num(v) * q));
   d.materials.forEach((m) => (m.grams = conv(m.grams)));
-  if (String(d.hours).trim() !== '') d.hours = fmt(mode === 'unit' ? parseHours(d.hours) / q : parseHours(d.hours) * q);
+  if (String(d.hours).trim() !== '') d.hours = String(mode === 'unit' ? parseHours(d.hours) / q : parseHours(d.hours) * q);
   d.extraCost = conv(d.extraCost);
   d.inputMode = mode;
 }
@@ -384,7 +405,7 @@ export function openFinishModal(state, printId) {
     <form data-form="finish" data-id="${p.id}" class="stack-12">
       <p class="muted">${esc(modelName(state, p.modelId))} · проверьте фактические значения</p>
       <div class="grid2">
-        ${field('Время, ч', numInput('hours', String(p.hours).replace('.', ',')))}
+        ${timeFields('hours', p.hours, 'Время всей печати')}
         ${field('Дата', `<input type="date" name="date" value="${today()}">`)}
       </div>
       ${materialInputs(state, p.materials)}
@@ -417,7 +438,7 @@ export function openFailureModal(state, draftOrPrint) {
       </div>
       <div class="grid2">
         ${field(`Годных изделий (из ${qty})`, numInput('goodQty', '0', 'inputmode="numeric"'), 'для частичного брака')}
-        ${field('Сколько успело напечататься, ч', numInput('hours', String(draftOrPrint.hours || '').replace('.', ',')), 'до остановки')}
+        ${timeFields('hours', draftOrPrint.hours, 'Сколько успело напечататься', 'до остановки, на всю печать')}
       </div>
       <p class="muted small">Укажите фактически ушедший материал. Если не знаете — уменьшите пропорционально времени или взвесьте катушку позже.</p>
       ${materialInputs(state, draftOrPrint.materials)}
@@ -433,7 +454,7 @@ export const newPrintForms = {
     const state = store.state;
     const p = state.prints.find((x) => x.id === form.dataset.id);
     const materials = readMaterials(f, p.materials.length);
-    const done = store.commit((s) => finalizePrint(s, { id: p.id, status: 'done', hours: f.hours, date: f.date, materials }));
+    const done = store.commit((s) => finalizePrint(s, { id: p.id, status: 'done', hours: readTime(f, 'hours') || p.hours, date: f.date, materials }));
     closeModal();
     toast(`Сохранено. Полная себестоимость ${money(done.totals.full)}`);
     ctx.go(`#/print/${done.id}`);
@@ -444,7 +465,7 @@ export const newPrintForms = {
     const status = f.kind === 'partial' ? 'partial' : 'failed';
     const qty = Math.max(1, Math.round(C.num(src.qty) || 1));
     if (status === 'partial' && !(C.num(f.goodQty) > 0 && C.num(f.goodQty) < qty)) return toast(`Годных должно быть от 1 до ${qty - 1}`, 'err');
-    const p = store.commit((s) => finalizePrint(s, { ...src, status, goodQty: f.goodQty, hours: f.hours, materials, failureReason: f.failureReason, comment: f.comment || src.comment }));
+    const p = store.commit((s) => finalizePrint(s, { ...src, status, goodQty: f.goodQty, hours: readTime(f, 'hours') === '' ? src.hours : readTime(f, 'hours'), materials, failureReason: f.failureReason, comment: f.comment || src.comment }));
     ctx.ui.draft = null;
     closeModal();
     toast(`Брак записан: ${money(p.split.failCost)}`, 'warn');

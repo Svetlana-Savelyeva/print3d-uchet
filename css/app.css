@@ -375,3 +375,9 @@ label.price-opt input[name="price"] { margin-top: 6px; }
   .film-btn { padding: 8px 10px; }
   .film-btn span { display: none; }
 }
+
+/* Время: часы + минуты */
+.time-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tp { position: relative; }
+.tp em { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); font-weight: 600; pointer-events: none; }
+.tp input { padding-right: 44px !important; }

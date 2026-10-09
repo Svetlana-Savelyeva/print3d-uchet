@@ -156,7 +156,7 @@ export function computeCost(input) {
   } else if (hours > 0) {
     const watts = num(input.printerW || settings.printerW) + num(settings.extraW);
     const kwh = (watts / 1000) * hours;
-    charges.push({ kind: 'electricity', label: 'Электричество', base: `${fmtNum(watts)} Вт × ${fmtNum(hours)} ч = ${fmtNum(round2(kwh))} кВт·ч`, rate: `${fmtNum(settings.tariff)} ₽/кВт·ч`, amount: round2(kwh * num(settings.tariff)), sourceId: null });
+    charges.push({ kind: 'electricity', label: 'Электричество', base: `${fmtNum(watts)} Вт × ${fmtTime(hours)} = ${fmtNum(round2(kwh))} кВт·ч`, rate: `${fmtNum(settings.tariff)} ₽/кВт·ч`, amount: round2(kwh * num(settings.tariff)), sourceId: null });
   }
   if (num(input.extraCost) > 0) {
     charges.push({ kind: 'extra', label: input.extraLabel || 'Доп. прямые расходы', base: '', rate: '', amount: round2(num(input.extraCost)), sourceId: null });
@@ -170,7 +170,7 @@ export function computeCost(input) {
     const remaining = round2(amortBase(eq) - chargeAccrued(eq.id, input.prints || []));
     const amount = round2(Math.max(0, Math.min(rate * hours, remaining)));
     if (amount <= 0) continue;
-    charges.push({ kind: 'amortization', label: `Амортизация: ${eq.name}`, base: `${fmtNum(hours)} ч`, rate: `${fmtNum(round2(rate))} ₽/ч`, amount, sourceId: eq.id });
+    charges.push({ kind: 'amortization', label: `Амортизация: ${eq.name}`, base: `${fmtTime(hours)}`, rate: `${fmtNum(round2(rate))} ₽/ч`, amount, sourceId: eq.id });
   }
 
   // Эксплуатационные расходы по заранее заданной ставке.
@@ -181,7 +181,7 @@ export function computeCost(input) {
     const remaining = round2(num(c.price) - chargeAccrued(c.id, input.prints || []));
     const amount = round2(Math.max(0, Math.min(rate * base, remaining)));
     if (amount <= 0) continue;
-    charges.push({ kind: 'ops', label: c.name, base: c.mode === 'hour' ? `${fmtNum(hours)} ч` : '1 печать', rate: c.mode === 'hour' ? `${fmtNum(round2(rate))} ₽/ч` : `${fmtNum(round2(rate))} ₽/печать`, amount, sourceId: c.id });
+    charges.push({ kind: 'ops', label: c.name, base: c.mode === 'hour' ? `${fmtTime(hours)}` : '1 печать', rate: c.mode === 'hour' ? `${fmtNum(round2(rate))} ₽/ч` : `${fmtNum(round2(rate))} ₽/печать`, amount, sourceId: c.id });
   }
 
   const k = (kind) => round2(sum(charges.filter((c) => c.kind === kind), (c) => c.amount));
@@ -403,6 +403,12 @@ export function modelStats(modelId, prints) {
     lastUnit: goodPrints.length ? goodPrints[goodPrints.length - 1].split.unit : 0,
     last: own[own.length - 1] || null,
   };
+}
+
+export function fmtTime(h) {
+  const t = Math.round(num(h) * 60);
+  const hh = Math.floor(t / 60), mm = t % 60;
+  return hh ? `${hh} ч${mm ? ` ${mm} мин` : ''}` : `${mm} мин`;
 }
 
 export function fmtNum(n) {
