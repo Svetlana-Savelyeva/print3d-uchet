@@ -181,7 +181,39 @@ export const printers = (state) => state.equipment.filter((e) => e.type === 'pri
 
 // ---------- Филамент ----------
 export function spoolLabel(s) {
-  return [s.material, s.colorName].filter(Boolean).join(' ') + (s.brand ? ` · ${s.brand}` : '');
+  return [s.material, s.line, s.colorName].filter(Boolean).join(' ') + (s.brand ? ` · ${s.brand}` : '');
+}
+
+/**
+ * Исправляет данные катушки. Цена грамма пересчитывается для будущих печатей;
+ * завершённые печати хранят свою цену грамма (snapshot) и не меняются.
+ */
+export function updateSpool(state, id, f) {
+  const s = state.spools.find((x) => x.id === id);
+  if (!s) return;
+  for (const k of ['brand', 'material', 'line', 'colorName', 'hex', 'shop', 'batch', 'location', 'notes', 'date']) {
+    if (f[k] !== undefined) s[k] = f[k];
+  }
+  if (f.tareG !== undefined) s.tareG = C.num(f.tareG) || null;
+  if (f.price !== undefined) s.price = C.num(f.price);
+  if (f.delivery !== undefined) s.delivery = C.num(f.delivery);
+  if (f.netG !== undefined && C.num(f.netG) > 0 && C.num(f.netG) !== s.netG) {
+    const diff = C.num(f.netG) - s.netG;
+    s.netG = C.num(f.netG);
+    const buy = state.movements.find((m) => m.spoolId === id && m.type === 'purchase');
+    if (buy) buy.grams += diff;
+  }
+  s.costPerG = C.costPerGram(s.price, s.delivery, s.netG);
+  s.label = spoolLabel(s);
+  // Покупка в журнале покупок пересчитывается по всем катушкам этого чека.
+  const pur = state.purchases.find((p) => p.link?.type === 'spools' && p.link.ids.includes(id));
+  if (pur) {
+    const group = state.spools.filter((x) => pur.link.ids.includes(x.id));
+    pur.amount = C.round2(group.reduce((a, x) => a + C.num(x.price) + C.num(x.delivery), 0));
+    pur.name = `Филамент ${spoolLabel(group[0])}${group.length > 1 ? ` × ${group.length}` : ''}`;
+    pur.date = s.date;
+    pur.shop = s.shop;
+  }
 }
 
 export function addSpools(state, f) {
@@ -197,6 +229,7 @@ export function addSpools(state, f) {
       id: uid(),
       brand: f.brand || '',
       material: f.material || 'PLA',
+      line: f.line || '',
       colorName: f.colorName || '',
       hex: f.hex || '#cccccc',
       netG,

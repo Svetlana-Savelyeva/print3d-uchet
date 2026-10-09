@@ -12,12 +12,12 @@ export function buildDemo() {
   addConsumable(s, { name: 'Силикагель', price: 350, mode: 'money', category: 'silica', date: '2026-09-02' });
 
   const sp = (f) => addSpools(s, f)[0];
-  const C = sp({ material: 'PLA', brand: 'Bambu', colorName: 'Чёрный матовый', hex: '#2A2B30', price: 1120, tareG: 250, date: '2026-08-20', shop: 'Bambu Store' });
-  const D = sp({ material: 'PLA', brand: 'Bambu', colorName: 'Зелёный', hex: '#4FA36A', price: 1250, tareG: 250, date: '2026-09-02', shop: 'Bambu Store' });
+  const C = sp({ material: 'PLA', line: 'Matte', brand: 'Bambu', colorName: 'Чёрный', hex: '#2A2B30', price: 1120, tareG: 250, date: '2026-08-20', shop: 'Bambu Store' });
+  const D = sp({ material: 'PLA', line: 'Basic', brand: 'Bambu', colorName: 'Зелёный', hex: '#4FA36A', price: 1250, tareG: 250, date: '2026-09-02', shop: 'Bambu Store' });
   const B = sp({ material: 'PETG', brand: 'Другой бренд', colorName: 'Белый', hex: '#EDEDE8', price: 1080, tareG: 230, date: '2026-09-02', shop: 'Маркетплейс' });
-  const E = sp({ material: 'TPU', brand: '', colorName: 'Синий', hex: '#3E6FD8', price: 1450, netG: 500, date: '2026-09-10', shop: 'Маркетплейс' });
-  const A = sp({ material: 'PETG', brand: 'Bambu', colorName: 'Белый', hex: '#F4F4F2', price: 1370, tareG: 250, date: '2026-09-24', shop: 'Bambu Store' });
-  const F = sp({ material: 'PETG', brand: 'Bambu', colorName: 'Серый', hex: '#9AA0AA', price: 1300, tareG: 250, date: '2026-10-07', shop: 'Bambu Store' });
+  const E = sp({ material: 'TPU', line: '95A', brand: '', colorName: 'Синий', hex: '#3E6FD8', price: 1450, netG: 500, date: '2026-09-10', shop: 'Маркетплейс' });
+  const A = sp({ material: 'PETG', line: 'Basic', brand: 'Bambu', colorName: 'Белый', hex: '#F4F4F2', price: 1370, tareG: 250, date: '2026-09-24', shop: 'Bambu Store' });
+  const F = sp({ material: 'PETG', line: 'HF', brand: 'Bambu', colorName: 'Серый', hex: '#9AA0AA', price: 1300, tareG: 250, date: '2026-10-07', shop: 'Bambu Store' });
 
   const M = (name, purpose, url = '') => saveModel(s, { name, defaultPurpose: purpose, sourceUrl: url });
   const stand = M('Подставка для телефона', 'sale');

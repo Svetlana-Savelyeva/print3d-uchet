@@ -1,6 +1,8 @@
 // Склад филаментов: катушки, журнал движений, взвешивание.
 import * as C from '../calc.js';
-import { store, today, addSpools, weighSpool, closeSpool, spoolLabel, modelName } from '../store.js';
+import { store, today, addSpools, weighSpool, closeSpool, updateSpool, spoolLabel, modelName } from '../store.js';
+
+const kind = (s) => [s.material, s.line].filter(Boolean).join(' ') + (s.brand ? ' · ' + s.brand : '');
 import { ctx, esc, money, money0, grams, nf, dateShort, dateText, icon, chip, swatch, pageHead, emptyBox, field, numInput, selectEl, openModal, closeModal, modalHead, toast } from '../ui.js';
 
 const STATUS = {
@@ -10,7 +12,9 @@ const STATUS = {
   empty: { label: 'Закончилась', bg: '#F3F5FB', fg: '#6B7490' },
 };
 const MOVE = { purchase: 'Покупка', print: 'Печать', failure: 'Брак', adjust: 'Корректировка', writeoff: 'Списание', reverse: 'Сторно', initial: 'До начала учёта' };
-const MATERIALS = ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'PA', 'PC', 'PVA', 'Другое'];
+const MATERIALS = ['PLA', 'PLA+', 'PETG', 'ABS', 'ASA', 'TPU', 'PA', 'PC', 'PVA', 'HIPS', 'PET-CF', 'PA-CF'];
+const LINES = ['Basic', 'Lite', 'Matte', 'Silk', 'Silk+', 'Tough', 'HF', 'CF', 'Translucent', 'Metal', 'Marble', 'Sparkle', 'Galaxy', 'Glow', 'Wood', 'Aero', 'Gradient', '95A', '90A'];
+const BRANDS = ['Bambu', 'eSun', 'Elegoo', 'Polymaker', 'Sunlu', 'Creality', 'Eryone', 'Bestfilament', 'REC', 'Filamentarno'];
 
 export function renderSpools(state, route) {
   const showEmpty = route.query.all === '1';
@@ -26,7 +30,7 @@ export function renderSpools(state, route) {
   ${active.length ? `<div class="spool-grid">${active.sort((a, b) => order(a.status) - order(b.status)).map(({ s, st, status }) => `
     <a class="spool-card ${status === 'empty' ? 'dim' : ''}" href="#/spool/${s.id}">
       <span class="row-between">${swatch(s.hex, 44)}${chip(STATUS[status].label, STATUS[status])}</span>
-      <span><b class="h3">${esc(s.colorName || s.material)}</b><br><small class="muted">${esc(s.material)}${s.brand ? ' · ' + esc(s.brand) : ''} · ${nf(s.costPerG)} ₽/г</small></span>
+      <span><b class="h3">${esc(s.colorName || s.material)}</b><br><small class="muted">${esc(kind(s))} · ${nf(s.costPerG)} ₽/г</small></span>
       <span class="bar"><i style="width:${Math.max(0, Math.min(100, (st.left / s.netG) * 100))}%;background:${status === 'low' ? '#B23A2F' : '#4F62E0'}"></i></span>
       <b class="small">${grams(st.left)} из ${grams(s.netG)} · ${money0(st.value)}</b>
     </a>`).join('')}</div>` : emptyBox('Добавьте катушки, которые есть у вас дома: для уже начатых укажите примерный остаток.', '<button class="btn primary" data-act="spool-add">Добавить катушки</button>')}
@@ -43,8 +47,8 @@ export function renderSpool(state, route) {
   const parts = [['печати', st.printed], ['брак', st.failed], ['корректировки', st.adjusted], ['списано', st.writtenOff], ['до учёта', -C.round2(moves.filter((m) => m.type === 'initial').reduce((a, m) => a + m.grams, 0))], ['сторно', -st.reversed]].filter(([, v]) => v);
   return `
   <div class="page-head"><div class="stack-8"><a class="back" href="#/spools">${icon.back(16)} Филаменты</a>
-    <div class="row gap12">${swatch(s.hex, 52)}<div><h1>${esc(s.colorName || s.material)}</h1><div class="muted">${esc(s.material)}${s.brand ? ' · ' + esc(s.brand) : ''} · ${nf(s.costPerG)} ₽/г</div></div></div></div>
-    ${chip(STATUS[status].label, STATUS[status])}</div>
+    <div class="row gap12">${swatch(s.hex, 52)}<div><h1>${esc(s.colorName || s.material)}</h1><div class="muted">${esc(kind(s))} · ${nf(s.costPerG)} ₽/г</div></div></div></div>
+    <div class="row gap8">${chip(STATUS[status].label, STATUS[status])}<button class="btn soft small" data-act="spool-edit" data-id="${s.id}">Изменить</button></div></div>
   <div class="detail-grid">
     <div class="stack-20" style="min-width:0">
       <div class="tiles">
@@ -82,40 +86,50 @@ export function renderSpool(state, route) {
   </div>`;
 }
 
-export function openSpoolForm(state, base = {}) {
-  openModal(`${modalHead(base.id ? 'Ещё такая же катушка' : 'Добавить катушки')}
-  <form data-form="spool-add" class="stack-12">
-    <div class="grid2">
-      ${field('Материал', selectEl('material', MATERIALS.map((m) => [m, m]), base.material || 'PLA'))}
-      ${field('Производитель', `<input name="brand" value="${esc(base.brand || '')}" placeholder="Bambu, eSun…">`)}
+// mode: 'new' — новая покупка, 'again' — ещё такая же, 'edit' — исправить внесённую катушку.
+export function openSpoolForm(state, base = {}, mode = 'new') {
+  const edit = mode === 'edit';
+  const known = (key) => [...new Set(state.spools.map((s) => s[key]).filter(Boolean))];
+  const list = (id, items) => `<datalist id="${id}">${[...new Set(items)].map((v) => `<option value="${esc(v)}"></option>`).join('')}</datalist>`;
+  const title = edit ? 'Изменить катушку' : mode === 'again' ? 'Ещё такая же катушка' : 'Добавить катушки';
+  openModal(`${modalHead(title)}
+  <form data-form="${edit ? 'spool-edit' : 'spool-add'}" ${edit ? `data-id="${base.id}"` : ''} class="stack-12">
+    <div class="grid3">
+      ${field('Материал', `<input name="material" value="${esc(base.material || 'PLA')}" list="dl-material" required>`)}
+      ${field('Серия', `<input name="line" value="${esc(base.line || '')}" list="dl-line" placeholder="Basic, Lite, Matte…">`, 'можно выбрать или вписать свою')}
+      ${field('Производитель', `<input name="brand" value="${esc(base.brand || '')}" list="dl-brand" placeholder="Bambu, eSun…">`)}
     </div>
+    ${list('dl-material', [...MATERIALS, ...known('material')])}
+    ${list('dl-line', [...LINES, ...known('line')])}
+    ${list('dl-brand', [...BRANDS, ...known('brand')])}
     <div class="grid2">
       ${field('Цвет', `<input name="colorName" value="${esc(base.colorName || '')}" placeholder="Белый" required>`)}
       ${field('Оттенок', `<input type="color" name="hex" value="${esc(base.hex || '#f4f4f2')}">`)}
     </div>
     <div class="grid3">
       ${field('Цена 1 катушки, ₽', numInput('price', base.price ?? '', 'required'))}
-      ${field('Сколько штук', numInput('count', '1', 'inputmode="numeric"'))}
-      ${field('Доставка за всё, ₽', numInput('delivery', '', 'placeholder="0"'))}
+      ${edit ? field('Доставка за эту катушку, ₽', numInput('delivery', base.delivery || '', 'placeholder="0"')) : `${field('Сколько штук', numInput('count', '1', 'inputmode="numeric"'))}${field('Доставка за всё, ₽', numInput('delivery', '', 'placeholder="0"'))}`}
     </div>
     <div class="grid3">
       ${field('Пластика в катушке, г', numInput('netG', base.netG || 1000))}
       ${field('Пустая катушка, г', numInput('tareG', base.tareG || '', 'placeholder="если знаете"'))}
-      ${field('Дата покупки', `<input type="date" name="date" value="${today()}">`)}
+      ${field('Дата покупки', `<input type="date" name="date" value="${edit ? esc(base.date) : today()}">`)}
     </div>
     <div class="grid2">
       ${field('Магазин', `<input name="shop" value="${esc(base.shop || '')}">`)}
       ${field('Где хранится', `<input name="location" value="${esc(base.location || '')}" placeholder="сушильный бокс…">`)}
     </div>
-    ${base.id ? '' : field('Катушка уже начата? Остаток, г', numInput('left', '', 'placeholder="оставьте пустым для новой"'), 'Для катушек, купленных до начала учёта. Израсходованное раньше не попадёт ни в печати, ни в потери.')}
-    <button class="btn primary big" type="submit">Добавить на склад</button>
-    <p class="muted tiny">Покупка сразу появится в журнале покупок. Цена грамма = (цена + доля доставки) ÷ вес пластика.</p>
+    ${edit ? `<div class="grid2">${field('Номер партии', `<input name="batch" value="${esc(base.batch || '')}">`)}${field('Заметки', `<input name="notes" value="${esc(base.notes || '')}">`)}</div>` : ''}
+    ${mode === 'new' ? field('Катушка уже начата? Остаток, г', numInput('left', '', 'placeholder="оставьте пустым для новой"'), 'Для катушек, купленных до начала учёта. Израсходованное раньше не попадёт ни в печати, ни в потери.') : ''}
+    <button class="btn primary big" type="submit">${edit ? 'Сохранить изменения' : 'Добавить на склад'}</button>
+    <p class="muted tiny">${edit ? 'Новая цена грамма применится к следующим печатям. Уже завершённые печати сохраняют свою себестоимость. Сумма в журнале покупок обновится.' : 'Покупка сразу появится в журнале покупок. Цена грамма = (цена + доля доставки) ÷ вес пластика.'}</p>
   </form>`);
 }
 
 export const spoolActions = {
   'spool-add': () => openSpoolForm(store.state),
-  'spool-again': (el) => openSpoolForm(store.state, store.state.spools.find((s) => s.id === el.dataset.id)),
+  'spool-again': (el) => openSpoolForm(store.state, store.state.spools.find((s) => s.id === el.dataset.id), 'again'),
+  'spool-edit': (el) => openSpoolForm(store.state, store.state.spools.find((s) => s.id === el.dataset.id), 'edit'),
   'spool-close': (el) => {
     if (!confirm('Отметить катушку как закончившуюся? Остаток (если есть) спишется отдельной записью.')) return;
     store.commit((s) => closeSpool(s, el.dataset.id));
@@ -130,6 +144,12 @@ export const spoolForms = {
     closeModal();
     toast(created.length > 1 ? `Добавлено катушек: ${created.length}` : 'Катушка добавлена');
     ctx.go(`#/spool/${created[0].id}`);
+  },
+  'spool-edit': (form, f) => {
+    if (!(C.num(f.price) > 0)) return toast('Укажите цену катушки', 'err');
+    store.commit((s) => updateSpool(s, form.dataset.id, f));
+    closeModal();
+    toast('Катушка обновлена');
   },
   weigh: (form, f) => {
     const id = form.dataset.id;

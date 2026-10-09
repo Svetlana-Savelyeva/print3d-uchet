@@ -123,7 +123,7 @@ export function renderHome(state) {
     <div class="card stack-12" style="flex:1 1 320px">
       <div class="row gap10"><span class="ico-badge red">${icon.alert(20)}</span><b class="h3">Заканчиваются</b></div>
       ${low.length ? low.map(({ s, st }) => `
-        <a class="spool-mini" href="#/spool/${s.id}">${swatch(s.hex, 34)}<span class="grow"><b>${esc(s.colorName || s.material)}</b><small class="muted">${esc(s.material)}${s.brand ? ' · ' + esc(s.brand) : ''}</small></span><b class="neg">${grams(st.left)}</b></a>`).join('') : '<div class="muted">Всего хватает</div>'}
+        <a class="spool-mini" href="#/spool/${s.id}">${swatch(s.hex, 34)}<span class="grow"><b>${esc(s.colorName || s.material)}</b><small class="muted">${esc([s.material, s.line].filter(Boolean).join(' '))}${s.brand ? ' · ' + esc(s.brand) : ''}</small></span><b class="neg">${grams(st.left)}</b></a>`).join('') : '<div class="muted">Всего хватает</div>'}
       <a class="link" href="#/spools">Склад филаментов</a>
     </div>
     <div class="card flush" style="flex:999 1 560px;min-width:0">
