@@ -165,5 +165,25 @@ ctx.go = (hash) => { if (location.hash === hash) render(); else location.hash = 
   sync.listeners.add(() => { paintSyncPill(); if (parseRoute().name === 'sync') render(); });
   render();
   startSync();
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+  registerUpdates();
 })();
+
+// Обновления: при выходе новой версии приложение тихо перезагружается само.
+function registerUpdates() {
+  if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    // Не перебиваем ввод: если открыта форма новой печати или окно, перезагрузимся позже.
+    const busy = () => location.hash.startsWith('#/new') || !document.getElementById('modal').hidden;
+    if (!busy()) location.reload();
+    else window.addEventListener('hashchange', function once() { if (!busy()) { window.removeEventListener('hashchange', once); location.reload(); } });
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+}

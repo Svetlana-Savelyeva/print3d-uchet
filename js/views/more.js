@@ -3,6 +3,7 @@ import * as C from '../calc.js';
 import { store, today, emptyState, addEquipment, updateEquipment, addConsumable, retireConsumable, addPurchase, photos, modelName, spoolLabel } from '../store.js';
 import { buildDemo } from '../demo.js';
 import { getConfig } from '../sync.js';
+import { VERSION } from '../version.js';
 import { ctx, esc, money, money0, nf, dateText, dateShort, icon, chip, GROUP_STYLE, pageHead, emptyBox, field, numInput, selectEl, openModal, closeModal, modalHead, toast } from '../ui.js';
 
 export function renderMore(state) {
@@ -17,6 +18,7 @@ export function renderMore(state) {
     ${tile('#/settings', icon.gear(20), 'Настройки', 'тариф, мощность, комиссия')}
     ${tile('#/backup', icon.download(20), 'Резервная копия', 'сохранить, восстановить, Excel')}
   </div>
+  <p class="muted tiny">Версия приложения ${VERSION}</p>
   <p class="muted small">Окупаемость: вложено ${money0(pb.invested)}, вернулось ${money0(pb.effect)}.</p>`;
 }
 
