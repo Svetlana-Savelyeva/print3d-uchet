@@ -117,12 +117,16 @@ export function renderPrint(state, route) {
   </div>`;
 }
 
-// Для изделий Merino Home продажа на сторону — редкий случай, поэтому блок свёрнут.
+// Цена продажи раскрыта только у печатей «на продажу». У личного, подарков, тестов и Merino Home
+// продажа — редкий случай, поэтому блок свёрнут в одну строку.
 function saleBlock(state, p, sellable, sales) {
   const html = priceAndSale(state, p, sellable, sales);
+  const groupOf = (id) => state.purposes.find((x) => x.id === id)?.group;
+  const forSale = (p.outputs || []).some((o) => groupOf(o.purposeId) === 'sale');
+  if (forSale || sales.length) return html;
   const forOwner = (p.outputs || []).some((o) => C.num(o.ownerShare) > 0);
-  if (!forOwner || sales.length) return html;
-  return `<details class="card sale-details"><summary>Продать на сторону вместо Merino Home</summary>${html.replace('<div class="card stack-12">', '<div class="stack-12">')}</details>`;
+  const label = forOwner ? 'Продать на сторону вместо Merino Home' : 'Всё-таки продать?';
+  return `<details class="card sale-details"><summary>${label}</summary>${html.replace('<div class="card stack-12">', '<div class="stack-12">')}</details>`;
 }
 
 function priceAndSale(state, p, sellable, sales) {
