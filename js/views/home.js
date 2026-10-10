@@ -2,7 +2,7 @@ import * as C from '../calc.js';
 import { modelName, today, printers } from '../store.js';
 import { ctx, esc, money, money0, grams, nf, hoursText, dateShort, icon, GROUP_STYLE, STATUS, chip, purposeChip, swatch } from '../ui.js';
 
-const PERIODS = [['today', 'Сегодня'], ['week', 'Неделя'], ['month', 'Месяц'], ['year', 'Год'], ['all', 'Всё время']];
+const PERIODS = [['today', 'Сегодня', 'День'], ['week', 'Неделя', 'Неделя'], ['month', 'Месяц', 'Месяц'], ['year', 'Год', 'Год'], ['all', 'Всё время', 'Всё']];
 const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
 
 function periodTitle(p) {
@@ -36,7 +36,7 @@ export function renderHome(state) {
   return `
   <div class="page-head">
     <div><h1>${esc(periodTitle(period))}</h1>${state.demo ? '<div class="muted">Демо-данные · очистить можно в «Ещё → Резервная копия»</div>' : ''}</div>
-    <div class="seg">${PERIODS.map(([k, l]) => `<button class="${k === period ? 'on' : ''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="seg period-seg">${PERIODS.map(([k, l, s]) => `<button class="${k === period ? 'on' : ''}" data-act="period" data-v="${k}"><span class="l-full">${l}</span><span class="l-short">${s}</span></button>`).join('')}</div>
   </div>
 
   <div class="kpis">

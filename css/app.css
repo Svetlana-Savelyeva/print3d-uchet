@@ -381,3 +381,54 @@ label.price-opt input[name="price"] { margin-top: 6px; }
 .tp { position: relative; }
 .tp em { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); font-weight: 600; pointer-events: none; }
 .tp input { padding-right: 44px !important; }
+
+/* ---------- Телефон: таблицы превращаются в карточки ---------- */
+.l-short { display: none; }
+@media (max-width: 700px) {
+  /* Период: одна строка из пяти равных кнопок */
+  .period-seg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 4px; }
+  .period-seg button { padding: 9px 2px; font-size: 14px; text-align: center; }
+  .period-seg .l-full { display: none; }
+  .period-seg .l-short { display: inline; }
+
+  /* Журнал печатей */
+  .table-scroll { overflow-x: visible; }
+  .ptable, .sales-list, .btable { min-width: 0; }
+  .pt-head, .bt-head { display: none; }
+  .pt-row { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "name name name cost" "date purpose status status"; gap: 8px 10px; padding: 14px 18px; align-items: center; }
+  .pt-row > :nth-child(1) { grid-area: date; font-size: 13px; }
+  .pt-row > :nth-child(2) { grid-area: name; min-width: 0; }
+  .pt-row > :nth-child(3) { grid-area: purpose; }
+  .pt-row > :nth-child(4) { grid-area: status; }
+  .pt-row > :nth-child(5) { grid-area: cost; align-self: start; }
+  .pt-row .chip { font-size: 12px; padding: 4px 9px; }
+  .pt-wrap .pt-row { padding-right: 4px; }
+  .del-btn { margin-right: 8px; }
+
+  /* Продажи на главной */
+  .sales-list { gap: 6px; }
+  .sale-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "name name profit" "date qty revenue"; gap: 4px 10px; padding: 12px 14px; }
+  .sale-row > :nth-child(1) { grid-area: date; font-size: 13px; }
+  .sale-row > :nth-child(2) { grid-area: name; min-width: 0; }
+  .sale-row > :nth-child(3) { grid-area: qty; font-size: 13px; }
+  .sale-row > :nth-child(4) { display: none; }
+  .sale-row > :nth-child(5) { grid-area: revenue; font-size: 13px; color: var(--muted); }
+  .sale-row > :nth-child(6) { grid-area: profit; }
+
+  /* «Как рассчитано» */
+  .bt-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label sum" "base rate"; gap: 2px 12px; padding: 12px 18px; }
+  .bt-row > :nth-child(1) { grid-area: label; }
+  .bt-row > :nth-child(2) { grid-area: base; font-size: 13px; }
+  .bt-row > :nth-child(3) { grid-area: rate; font-size: 13px; }
+  .bt-row > :nth-child(4) { grid-area: sum; }
+  .bt-row.total > :nth-child(2), .bt-row.total > :nth-child(3) { display: none; }
+  .bt-foot { padding: 12px 18px; }
+  .move-row { padding: 12px 18px; }
+  .page-head .seg { width: 100%; }
+}
+@media (max-width: 700px) {
+  .printing { gap: 12px; }
+  .printing .thumb { display: none; }
+  .printing > .row { width: 100%; }
+  .printing > .row .btn { flex: 1; }
+}
