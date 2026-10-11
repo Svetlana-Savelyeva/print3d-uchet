@@ -53,6 +53,21 @@ export function renderCatalog(state) {
   }).join('')}</div>` : emptyBox('Моделей пока нет — они появятся сами после первой печати.')}`;
 }
 
+// Последняя цена продажи за штуку и последняя цена для Merino Home.
+const newest = (a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.id < b.id ? 1 : -1);
+function priceTiles(state, modelId) {
+  const sale = state.sales.filter((s) => s.modelId === modelId).sort(newest)[0];
+  const mh = state.prints
+    .filter((p) => p.modelId === modelId && p.finalized && (p.outputs || []).some((o) => C.num(o.ownerShare) > 0))
+    .sort(newest)[0];
+  const mhOut = mh && mh.outputs.find((o) => C.num(o.ownerShare) > 0);
+  let html = sale
+    ? `<div class="tile lilac"><span>Последняя продажа</span><b>${money(sale.price)} <small class="muted">за шт.</small></b><small>${dateText(sale.date)} · ${sale.qty} шт. · ${sale.channel === 'mp' ? 'маркетплейс' : 'лично / Авито'}</small></div>`
+    : `<div class="tile"><span>Последняя продажа</span><b>—</b><small>ещё не продавали</small></div>`;
+  if (mhOut) html += `<div class="tile"><span>Цена для Merino Home</span><b>${money(mhOut.unitPrice || mh.split.unit)} <small class="muted">за шт.</small></b><small>${dateText(mh.date)} · собственнику ${nf(mhOut.ownerShare, 1)} %</small></div>`;
+  return html;
+}
+
 export function renderModel(state, route) {
   const m = state.models.find((x) => x.id === route.id);
   if (!m) return emptyBox('Модель не найдена.', '<a class="btn soft" href="#/models">К каталогу</a>');
@@ -71,9 +86,10 @@ export function renderModel(state, route) {
         ${stat('Напечатано', `${st.units} шт.`)}
         ${stat('Печатей: успешно / брак', `${st.ok} / ${st.failed}`)}
         ${stat('Средняя себестоимость', st.avgUnit ? money(st.avgUnit) : '—')}
-        ${stat('Последняя', st.lastUnit ? money(st.lastUnit) : '—')}
+        ${stat('Последняя себестоимость', st.lastUnit ? money(st.lastUnit) : '—')}
         ${stat('Материала', st.grams >= 1000 ? `${nf(st.grams / 1000, 2)} кг` : `${nf(st.grams, 0)} г`)}
         ${stat('Время печати', hoursText(st.hours))}
+        ${priceTiles(state, m.id)}
       </div>
       <div class="card flush">
         <div class="h3 pad">История печатей</div>

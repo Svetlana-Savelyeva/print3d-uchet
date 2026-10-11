@@ -464,3 +464,4 @@ label.price-opt input[name="price"] { margin-top: 6px; }
   .rate { width: 40px; height: 40px; }
   .rate-filter .muted { width: 100%; }
 }
+.tile > b small { font-size: 13px; font-weight: 600; }
