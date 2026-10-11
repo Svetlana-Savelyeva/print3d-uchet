@@ -1,7 +1,7 @@
 // Каталог изделий: модель отдельно от конкретных печатей.
 import * as C from '../calc.js';
-import { store, saveModel } from '../store.js';
-import { ctx, esc, money, nf, hoursText, dateText, icon, chip, GROUP_STYLE, pageHead, emptyBox, field, selectEl, toast, photoImg, formData } from '../ui.js';
+import { store, saveModel, setModelRating } from '../store.js';
+import { ctx, esc, money, nf, hoursText, dateText, icon, chip, GROUP_STYLE, pageHead, emptyBox, field, selectEl, toast, photoImg, formData, ratingButtons, RATINGS } from '../ui.js';
 import { printRow } from './home.js';
 
 const groupOf = (state, purposeId) => state.purposes.find((p) => p.id === purposeId)?.group || 'other';
@@ -22,25 +22,34 @@ function variants(state, modelId) {
 export function renderCatalog(state) {
   const f = ctx.ui.catFilter;
   const groups = [['all', 'Все'], ...state.purposes.map((p) => [p.id, p.name])];
+  const rf = ctx.ui.rateFilter || 'all';
   const models = state.models
     .filter((m) => f === 'all' || m.defaultPurpose === f)
+    .filter((m) => rf === 'all' || (rf === 'none' ? !m.rating : m.rating === rf))
     .map((m) => ({ m, st: C.modelStats(m.id, state.prints) }))
     .sort((a, b) => ((b.st.last?.date || b.m.created || '') > (a.st.last?.date || a.m.created || '') ? 1 : -1));
   return `
   ${pageHead('Изделия', `Каталог всего, что вы печатали · ${state.models.length} моделей`, '<button class="btn soft" data-act="model-new">' + icon.plus(16) + ' Добавить модель</button>')}
   <div class="row wrap gap8">${groups.map(([k, l]) => `<button class="seg-chip ${k === f ? 'on' : ''}" data-act="cat-filter" data-v="${k}">${esc(l)}</button>`).join('')}</div>
+  <div class="row wrap gap8 rate-filter">
+    <span class="muted small fw600">Оценка:</span>
+    ${[['all', 'Любая'], ...RATINGS.map(([v, l]) => [v, l]), ['none', 'Без оценки']].map(([k, l]) => `<button class="seg-chip small-chip ${k === rf ? 'on' : ''} ${k !== 'all' && k !== 'none' ? `rf-${k}` : ''}" data-act="rate-filter" data-v="${k}">${k !== 'all' && k !== 'none' ? `<span class="rf-ico">${icon.thumb(14)}</span>` : ''}${esc(l)}</button>`).join('')}
+  </div>
   ${models.length ? `<div class="model-grid">${models.map(({ m, st }) => {
     const g = GROUP_STYLE[groupOf(state, m.defaultPurpose)];
     const purpose = state.purposes.find((p) => p.id === m.defaultPurpose);
-    return `<a class="model-card" href="#/model/${m.id}">
-      <span class="model-cover" style="background:${g.tint}">${m.photoId ? photoImg(m.photoId, 'cover-img') : icon.cube(54, 1.6)}
-        <span class="dots">${variants(state, m.id).slice(0, 5).map((v) => `<i style="background:${esc(v.hex)}"></i>`).join('')}</span></span>
-      <span class="stack-6 pad-s">
-        <b class="h3">${esc(m.name)}</b>
-        ${purpose ? chip(purpose.name, g) : ''}
-        <span class="small muted">напечатано ${st.units} шт.</span>
-      </span>
-    </a>`;
+    return `<div class="model-card">
+      <a class="model-link" href="#/model/${m.id}">
+        <span class="model-cover" style="background:${g.tint}">${m.photoId ? photoImg(m.photoId, 'cover-img') : icon.cube(54, 1.6)}
+          <span class="dots">${variants(state, m.id).slice(0, 5).map((v) => `<i style="background:${esc(v.hex)}"></i>`).join('')}</span></span>
+        <span class="stack-6 pad-s">
+          <b class="h3">${esc(m.name)}</b>
+          ${purpose ? chip(purpose.name, g) : ''}
+          <span class="small muted">напечатано ${st.units} шт.</span>
+        </span>
+      </a>
+      <div class="pad-s">${ratingButtons(m)}</div>
+    </div>`;
   }).join('')}</div>` : emptyBox('Моделей пока нет — они появятся сами после первой печати.')}`;
 }
 
@@ -78,6 +87,12 @@ export function renderModel(state, route) {
         <div class="cover-big" style="background:${g.tint}">${m.photoId ? photoImg(m.photoId, 'cover-img') : icon.cube(72, 1.5)}</div>
         <label class="photo-drop small">${icon.camera(22)}<span>${m.photoId ? 'Заменить основное фото' : 'Основное фото'}</span><input type="file" accept="image/*" data-photo-for="model:${m.id}" hidden></label>
       </div>
+      <form class="card stack-12" data-form="model-rating" data-id="${m.id}">
+        <div class="h3">Оценка модели</div>
+        <div class="row gap12 wrap">${ratingButtons(m, 22)}<span class="muted small">${m.rating ? RATINGS.find(([v]) => v === m.rating)[2] : 'пока без оценки'}</span></div>
+        ${field('Почему', `<textarea name="ratingNote" rows="2" placeholder="печатается без косяков, экономично / долго, много поддержек…">${esc(m.ratingNote || '')}</textarea>`)}
+        <button class="btn soft" type="submit">Сохранить заметку</button>
+      </form>
       <form class="card stack-12" data-form="model" data-id="${m.id}">
         <div class="h3">Карточка модели</div>
         ${field('Название', `<input name="name" value="${esc(m.name)}" required>`)}
@@ -92,6 +107,8 @@ export function renderModel(state, route) {
 
 export const catalogActions = {
   'cat-filter': (el) => { ctx.ui.catFilter = el.dataset.v; ctx.rerender(); },
+  'rate-filter': (el) => { ctx.ui.rateFilter = el.dataset.v; ctx.rerender(); },
+  rate: (el) => store.commit((s) => setModelRating(s, el.dataset.id, el.dataset.v)),
   'model-new': () => {
     const name = prompt('Название модели');
     if (!name) return;
@@ -101,6 +118,10 @@ export const catalogActions = {
 };
 
 export const catalogForms = {
+  'model-rating': (form, f) => {
+    store.commit((s) => saveModel(s, { id: form.dataset.id, ratingNote: f.ratingNote }));
+    toast('Заметка сохранена');
+  },
   model: (form, f) => {
     store.commit((s) => saveModel(s, { ...f, id: form.dataset.id }));
     toast('Сохранено');

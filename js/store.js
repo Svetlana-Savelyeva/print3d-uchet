@@ -328,9 +328,17 @@ export function saveModel(state, f) {
     sourceUrl: f.sourceUrl ?? m.sourceUrl ?? '',
     defaultPurpose: f.defaultPurpose ?? m.defaultPurpose ?? 'business',
     notes: f.notes ?? m.notes ?? '',
+    ratingNote: f.ratingNote ?? m.ratingNote ?? '',
   });
   if (f.photoId) m.photoId = f.photoId;
   return m;
+}
+
+/** Реакция на модель: good — печатать ещё, meh — так себе, bad — больше не печатать. Повтор снимает. */
+export function setModelRating(state, id, rating) {
+  const m = state.models.find((x) => x.id === id);
+  if (!m) return;
+  m.rating = m.rating === rating ? null : rating;
 }
 
 export function findOrCreateModel(state, { modelId, modelName, purposeId }) {

@@ -438,3 +438,29 @@ label.price-opt input[name="price"] { margin-top: 6px; }
   .sale-row > :nth-child(4) .chip { font-size: 11px; padding: 3px 8px; }
   .sale-row > :nth-child(3) { justify-self: end; }
 }
+
+/* Реакции на модели */
+.model-card { padding: 12px 12px 14px; }
+.model-link { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.model-card .model-link:hover .h3 { color: var(--accent); }
+.model-card:hover { border-color: transparent; }
+.rating { display: inline-flex; gap: 8px; }
+.rate { width: 44px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: #A3AAC2; display: inline-grid; place-items: center; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.rate:hover { color: var(--ink2); border-color: #CDD3E6; }
+.rate-meh svg { transform: rotate(-90deg); }
+.rate-bad svg { transform: scaleY(-1) scaleX(-1); }
+.rate-good.on { background: var(--green-soft); border-color: #9FD8B8; color: var(--green-ink); }
+.rate-meh.on { background: #FFF3E3; border-color: #F2CC91; color: #A35A12; }
+.rate-bad.on { background: var(--red-soft); border-color: #F3C4BE; color: var(--red); }
+.rate-filter { align-items: center; }
+.small-chip { padding: 7px 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.rf-ico { display: inline-grid; }
+.rf-meh .rf-ico svg { transform: rotate(-90deg); }
+.rf-bad .rf-ico svg { transform: scaleY(-1) scaleX(-1); }
+.rf-good .rf-ico { color: var(--green); } .rf-meh .rf-ico { color: #D08A2E; } .rf-bad .rf-ico { color: var(--red); }
+.seg-chip.on .rf-ico { color: #fff; }
+@media (max-width: 700px) {
+  .rating { gap: 6px; }
+  .rate { width: 40px; height: 40px; }
+  .rate-filter .muted { width: 100%; }
+}

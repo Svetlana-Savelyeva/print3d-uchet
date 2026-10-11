@@ -51,6 +51,7 @@ export const icon = {
   box: (s) => svg('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>', s),
   receipt: (s) => svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>', s),
   check: (s) => svg('<path d="M5 12l5 5 9-10"/>', s, 2.4),
+  thumb: (s) => svg('<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>', s, 2),
 };
 
 // Цвета назначений: группа → оттенок плашки.
@@ -135,3 +136,14 @@ export async function compressImage(file, max = 1400) {
   return new Promise((res) => c.toBlob(res, 'image/jpeg', 0.82));
 }
 export const photoImg = (id, cls = 'photo') => (id ? `<img class="${cls}" data-photo="${esc(id)}" alt="">` : '');
+
+// Реакции на модели.
+export const RATINGS = [
+  ['good', 'Напечатаю ещё', 'с удовольствием напечатаю ещё'],
+  ['meh', 'Так себе', 'можно, но есть варианты лучше'],
+  ['bad', 'Больше не печатаю', 'точно не буду печатать снова'],
+];
+export function ratingButtons(model, size = 18) {
+  return `<span class="rating" role="group" aria-label="Оценка модели">${RATINGS.map(([v, l]) =>
+    `<button type="button" class="rate rate-${v} ${model.rating === v ? 'on' : ''}" data-act="rate" data-id="${model.id}" data-v="${v}" aria-pressed="${model.rating === v}" title="${l}" aria-label="${l}">${icon.thumb(size)}</button>`).join('')}</span>`;
+}

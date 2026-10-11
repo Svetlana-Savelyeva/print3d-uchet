@@ -138,6 +138,7 @@ export function renderNewPrint(state) {
         <div class="step"><span>1</span>Что печатаем</div>
         <label class="search-input">${icon.search(18)}<input name="modelName" value="${esc(d.modelName)}" list="models-list" placeholder="Начните вводить название" aria-label="Название модели" autocomplete="off"></label>
         <small class="muted">${d.modelId ? 'Модель из каталога — данные взяты из её последней печати' : 'Появятся подсказки из каталога. Новое название — новая модель.'}</small>
+        ${ratingNotice(state, d.modelId)}
         <datalist id="models-list">${state.models.map((m) => `<option value="${esc(m.name)}"></option>`).join('')}</datalist>
         <div class="grid3">
           ${field('Принтер', ps.length ? selectEl('printerId', ps.map((p) => [p.id, p.name]), d.printerId) : '<div class="muted small">Добавьте принтер в «Ещё → Оборудование»</div>')}
@@ -196,6 +197,13 @@ export function renderNewPrint(state) {
       <p class="muted small">До завершения склад не меняется и ничего не начисляется.</p>
     </aside>
   </form>`;
+}
+
+function ratingNotice(state, modelId) {
+  const m = state.models.find((x) => x.id === modelId);
+  if (!m || (m.rating !== 'bad' && m.rating !== 'meh')) return '';
+  const bad = m.rating === 'bad';
+  return `<div class="${bad ? 'warn' : 'note'}">${bad ? 'Вы отметили эту модель: «Больше не печатаю».' : 'Вы оценили эту модель как «так себе».'}${m.ratingNote ? ` ${esc(m.ratingNote)}` : ''}</div>`;
 }
 
 function purposeHint(group) {
