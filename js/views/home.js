@@ -21,7 +21,7 @@ export function renderHome(state) {
     .filter((s) => !s.closed)
     .map((s) => ({ s, st: C.spoolStats(s, state.movements) }))
     .filter(({ st }) => st.left > 0 && st.left < state.settings.lowStockG);
-  const recent = state.prints.filter((p) => p.finalized).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6);
+  const recent = state.prints.filter((p) => p.finalized).sort(newestFirst).slice(0, 6);
   const dSales = d.sales;
 
   const groups = Object.entries(C.PURPOSE_GROUPS).map(([g, label]) => ({ g, label: g === 'business' ? 'Бизнес' : label, v: d.byGroup[g] }));
@@ -81,15 +81,7 @@ export function renderHome(state) {
       <div class="tile"><span>Продано</span><b>${dSales.qty} шт.</b><small>${dSales.count} ${plural(dSales.count, 'сделка', 'сделки', 'сделок')}${own.qty ? ` · Merino Home ${own.qty} шт.` : ''}</small></div>
       <div class="tile"><span>Маржа</span><b class="m-all">${earn.revenue ? Math.round((earn.profit / earn.revenue) * 100) : 0} %</b><small>прибыль ÷ выручка</small></div>
     </div>
-    ${dSales.list.length ? `<div class="table-scroll"><div class="sales-list">${dSales.list.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((s) => `
-      <a class="sale-row" href="#/print/${s.printId}">
-        <span class="muted">${dateShort(s.date)}</span>
-        <b>${esc(modelName(state, s.modelId))}</b>
-        <span class="muted">${s.qty} × ${money0(s.price)}</span>
-        <span>${chip(s.channel === 'mp' ? 'Маркетплейс' : 'Лично / Авито', GROUP_STYLE.sale)}</span>
-        <span class="right">${money0(s.r.revenue)}</span>
-        <b class="right ${s.r.profit < 0 ? 'neg' : 'pos'}">${s.r.profit < 0 ? '−' : '+'}${money0(Math.abs(s.r.profit))}</b>
-      </a>`).join('')}</div></div>` : ''}
+    ${earnList(state, d)}
   </div>
 
   <div class="two">
@@ -138,6 +130,40 @@ export function renderHome(state) {
       </div></div>` : '<div class="pad muted">Пока ни одной печати. Нажмите «Новая печать».</div>'}
     </div>
   </div>`;
+}
+
+// Продажи и изделия Merino Home за период — одним списком, последние внесённые сверху.
+const newestFirst = (a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.id < b.id ? 1 : -1);
+function earnList(state, d) {
+  const rows = d.sales.list.map((s) => ({
+    id: s.id, date: s.date, printId: s.printId, name: modelName(state, s.modelId),
+    qty: `${s.qty} × ${money0(s.price)}`, chip: chip(s.channel === 'mp' ? 'Маркетплейс' : 'Лично / Авито', GROUP_STYLE.sale),
+    revenue: s.r.revenue, profit: s.r.profit,
+  }));
+  const range = C.periodRange(ctx.ui.period, today());
+  for (const p of state.prints) {
+    if (!p.finalized || p.date < range.from || p.date > range.to) continue;
+    for (const o of p.outputs || []) {
+      if (!(C.num(o.ownerShare) > 0)) continue;
+      const r = C.ownerResult(o, p.split.unit, p.split.unitContribution);
+      rows.push({ id: p.id, date: p.date, printId: p.id, name: modelName(state, p.modelId), qty: `${o.qty} × ${money0(r.price)}`, chip: chip('Merino Home', GROUP_STYLE.business), revenue: r.owner, profit: r.profit });
+    }
+  }
+  if (!rows.length) return '';
+  rows.sort(newestFirst);
+  const SHOW = 3;
+  const open = ctx.ui.earnOpen;
+  const row = (r) => `<a class="sale-row" href="#/print/${r.printId}">
+        <span class="muted">${dateShort(r.date)}</span>
+        <b>${esc(r.name)}</b>
+        <span class="muted">${r.qty}</span>
+        <span>${r.chip}</span>
+        <span class="right">${money0(r.revenue)}</span>
+        <b class="right ${r.profit < 0 ? 'neg' : 'pos'}">${r.profit < 0 ? '−' : '+'}${money0(Math.abs(r.profit))}</b>
+      </a>`;
+  const shown = open ? rows : rows.slice(0, SHOW);
+  return `<div class="table-scroll"><div class="sales-list">${shown.map(row).join('')}</div></div>
+    ${rows.length > SHOW ? `<button class="btn ghost small" data-act="earn-toggle">${open ? 'Свернуть' : `Показать все (${rows.length})`}</button>` : ''}`;
 }
 
 export function printRow(state, p, withDelete = false) {

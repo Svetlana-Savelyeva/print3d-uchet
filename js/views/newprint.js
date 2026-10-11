@@ -126,13 +126,6 @@ export const draftToPrint = (d) => {
 
 export function renderNewPrint(state) {
   const d = ctx.ui.draft;
-  const recentModels = [...state.prints]
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map((p) => p.modelId)
-    .filter((id, i, arr) => arr.indexOf(id) === i)
-    .slice(0, 6)
-    .map((id) => state.models.find((m) => m.id === id))
-    .filter(Boolean);
   const ps = printers(state);
   const purpose = state.purposes.find((p) => p.id === d.purposeId);
   const choices = spoolChoices(state);
@@ -143,8 +136,8 @@ export function renderNewPrint(state) {
     <div class="np-main">
       <div class="card stack-12">
         <div class="step"><span>1</span>Что печатаем</div>
-        ${recentModels.length ? `<div class="row wrap gap8">${recentModels.map((m) => `<button type="button" class="pick ${m.id === d.modelId ? 'on' : ''}" data-act="np-model" data-id="${m.id}">${esc(m.name)}</button>`).join('')}</div>` : ''}
-        <label class="search-input">${icon.search(18)}<input name="modelName" value="${esc(d.modelName)}" list="models-list" placeholder="Название модели — новой или из каталога" aria-label="Название модели"></label>
+        <label class="search-input">${icon.search(18)}<input name="modelName" value="${esc(d.modelName)}" list="models-list" placeholder="Начните вводить название" aria-label="Название модели" autocomplete="off"></label>
+        <small class="muted">${d.modelId ? 'Модель из каталога — данные взяты из её последней печати' : 'Появятся подсказки из каталога. Новое название — новая модель.'}</small>
         <datalist id="models-list">${state.models.map((m) => `<option value="${esc(m.name)}"></option>`).join('')}</datalist>
         <div class="grid3">
           ${field('Принтер', ps.length ? selectEl('printerId', ps.map((p) => [p.id, p.name]), d.printerId) : '<div class="muted small">Добавьте принтер в «Ещё → Оборудование»</div>')}
@@ -290,6 +283,16 @@ export function refreshLive(state) {
   });
 }
 
+/** Выбрана знакомая модель (из подсказок) и данные ещё не введены — подставляем её последнюю печать. */
+export function onModelChosen(state, target) {
+  const d = ctx.ui.draft;
+  const m = state.models.find((x) => x.name.toLowerCase() === target.value.trim().toLowerCase());
+  if (!m) return;
+  const empty = d.materials.every((x) => !C.num(x.grams)) && !parseHours(d.hours);
+  const hasPrints = state.prints.some((p) => p.modelId === m.id && p.finalized);
+  if (empty && hasPrints) ctx.go(`#/new?model=${m.id}`);
+}
+
 export function onDraftInput(state, target) {
   const d = ctx.ui.draft;
   const name = target.name;
@@ -361,7 +364,6 @@ const draftForm = (d) => {
 };
 
 export const newPrintActions = {
-  'np-model': (el) => ctx.go(`#/new?model=${el.dataset.id}`),
   'np-add-row': () => {
     const d = ctx.ui.draft;
     const last = d.materials[d.materials.length - 1];

@@ -11,7 +11,7 @@ const FILTERS = [['all', 'Все'], ['done', 'Успешные'], ['failed', 'Б
 export function renderPrints(state, route) {
   const filter = route.query.filter || ctx.ui.printsFilter || 'all';
   const purpose = route.query.purpose || '';
-  let list = [...state.prints].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  let list = [...state.prints].sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.id < b.id ? 1 : -1));
   if (filter === 'done') list = list.filter((p) => p.status === 'done');
   if (filter === 'failed') list = list.filter((p) => p.status === 'failed' || p.status === 'partial');
   if (filter === 'printing') list = list.filter((p) => p.status === 'printing');

@@ -49,7 +49,7 @@ export function renderModel(state, route) {
   if (!m) return emptyBox('Модель не найдена.', '<a class="btn soft" href="#/models">К каталогу</a>');
   const st = C.modelStats(m.id, state.prints);
   const g = GROUP_STYLE[groupOf(state, m.defaultPurpose)];
-  const prints = state.prints.filter((p) => p.modelId === m.id).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const prints = state.prints.filter((p) => p.modelId === m.id).sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.id < b.id ? 1 : -1));
   const gallery = prints.flatMap((p) => p.photoIds || []);
   const stat = (l, v) => `<div class="tile"><span>${l}</span><b>${v}</b></div>`;
   return `

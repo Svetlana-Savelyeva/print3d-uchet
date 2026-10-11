@@ -4,7 +4,7 @@ import { filming, apply as applyFilming } from './filming.js';
 import { ctx, esc, icon, closeModal, formData, toast } from './ui.js';
 import { renderHome } from './views/home.js';
 import { renderPrints, renderPrint, printActions, printForms, salePreview, attachPhoto } from './views/prints.js';
-import { renderNewPrint, initDraft, newPrintActions, newPrintForms, onDraftInput, refreshLive } from './views/newprint.js';
+import { renderNewPrint, initDraft, newPrintActions, newPrintForms, onDraftInput, refreshLive, onModelChosen } from './views/newprint.js';
 import { renderCatalog, renderModel, catalogActions, catalogForms } from './views/catalog.js';
 import { renderSpools, renderSpool, spoolActions, spoolForms } from './views/spools.js';
 import { renderSync, syncActions, syncForms, syncPill, paintSyncPill } from './views/syncview.js';
@@ -41,6 +41,7 @@ const VIEWS = {
 
 const actions = { ...syncActions, ...printActions, ...newPrintActions, ...catalogActions, ...spoolActions, ...moreActions,
   period: (el) => { ctx.ui.period = el.dataset.v; render(); },
+  'earn-toggle': () => { ctx.ui.earnOpen = !ctx.ui.earnOpen; render(); },
   'modal-close': () => closeModal(),
   film: () => { filming.set(!filming.on); toast(filming.on ? 'Режим съёмки: суммы скрыты' : 'Суммы снова видны'); },
 };
@@ -148,6 +149,7 @@ document.addEventListener('change', (e) => {
     return;
   }
   if (t.dataset.actChange) { moreChange[t.dataset.actChange]?.(t); return; }
+  if (t.name === 'modelName' && t.closest('#np')) { onModelChosen(store.state, t); return; }
   if (t.dataset.nav === 'purpose') {
     const r = parseRoute();
     const q = new URLSearchParams(r.query);
