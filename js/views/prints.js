@@ -1,7 +1,7 @@
 // Журнал печатей и карточка печати: расшифровка себестоимости, фото, цена и продажа.
 import * as C from '../calc.js';
-import { store, today, modelName, setOwnerPrice, deletePrint, recordSale, deleteSale, sellableQty, photos, spoolLabel, uid } from '../store.js';
-import { ctx, esc, money, money0, grams, nf, hoursText, dateText, dateShort, icon, chip, purposeChip, STATUS, GROUP_STYLE, pageHead, emptyBox, field, numInput, toast, photoImg, compressImage } from '../ui.js';
+import { store, today, modelName, setOwnerPrice, updatePrintInfo, deletePrint, recordSale, deleteSale, sellableQty, photos, spoolLabel, uid } from '../store.js';
+import { ctx, esc, money, money0, grams, nf, hoursText, dateText, dateShort, icon, chip, purposeChip, STATUS, GROUP_STYLE, pageHead, emptyBox, field, numInput, toast, photoImg, compressImage, openModal, closeModal, modalHead, selectEl } from '../ui.js';
 import { printRow } from './home.js';
 import { queuePhoto } from '../sync.js';
 import { openFinishModal, openFailureModal } from './newprint.js';
@@ -48,6 +48,7 @@ export function renderPrint(state, route) {
       <div class="row wrap gap8">${chip(st.label, st)}${(p.outputs?.length ? p.outputs : [{ purposeId: p.purposeId }]).map((o) => purposeChip(state, o.purposeId)).join('')}${printer ? chip(printer.name, GROUP_STYLE.other) : ''}${chip(hoursText(p.hours), GROUP_STYLE.other)}${chip(dateText(p.date), GROUP_STYLE.other)}</div>
     </div>
     <div class="row gap8 wrap">
+      <button class="btn ghost" data-act="print-edit" data-id="${p.id}">Изменить</button>
       <a class="btn soft" href="#/new?repeat=${p.id}">${icon.repeat(16)} Повторить</a>
       <a class="btn ghost" href="#/model/${p.modelId}">Модель</a>
     </div>
@@ -206,6 +207,21 @@ export const printActions = {
     const p = store.state.prints.find((x) => x.id === el.dataset.id);
     openFailureModal(store.state, { ...p });
   },
+  'print-edit': (el) => {
+    const state = store.state;
+    const p = state.prints.find((x) => x.id === el.dataset.id);
+    const hasSales = state.sales.some((s) => s.printId === p.id);
+    openModal(`${modalHead('Изменить печать')}
+      <form data-form="print-edit" data-id="${p.id}" class="stack-12">
+        ${field('Дата печати', `<input type="date" name="date" value="${esc(p.date)}" required>`)}
+        ${field('Изделие', selectEl('modelId', state.models.map((m) => [m.id, m.name]).sort((a, b) => a[1].localeCompare(b[1], 'ru')), p.modelId), 'если при вводе выбрали не ту модель')}
+        ${hasSales ? `<div class="muted small">Назначение: ${esc(state.purposes.find((x) => x.id === p.purposeId)?.name || '')} — по печати уже есть продажи, назначение не меняется.</div>`
+          : field('Назначение', selectEl('purposeId', state.purposes.map((x) => [x.id, x.name]), p.purposeId))}
+        ${field('Комментарий', `<input name="comment" value="${esc(p.comment || '')}">`)}
+        <button class="btn primary big" type="submit">Сохранить</button>
+        <p class="muted tiny">Себестоимость не пересчитывается — она зафиксирована при печати. Если неверно указаны граммы, время или катушка, удалите печать и внесите заново через «Повторить».</p>
+      </form>`);
+  },
   'delete-print': (el) => {
     const state = store.state;
     const p = state.prints.find((x) => x.id === el.dataset.id);
@@ -241,6 +257,11 @@ export const printActions = {
 };
 
 export const printForms = {
+  'print-edit': (form, f) => {
+    store.commit((s) => updatePrintInfo(s, form.dataset.id, f));
+    closeModal();
+    toast('Печать обновлена');
+  },
   'owner-price': (form, f) => {
     if (f.mode === 'own' && !(C.num(f.price) > 0)) return toast('Впишите свою цену', 'err');
     store.commit((s) => setOwnerPrice(s, form.dataset.id, { mode: f.mode, price: f.price, share: f.share }));

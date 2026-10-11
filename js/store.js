@@ -450,6 +450,31 @@ const purposeGroupOf = (state, id) => state.purposes.find((x) => x.id === id)?.g
 export const modelName = (state, id) => state.models.find((m) => m.id === id)?.name || 'Без названия';
 
 /** Меняет цену и долю собственника для изделий Merino Home в завершённой печати. */
+/**
+ * Правка печати без пересчёта себестоимости: дата, модель, назначение, комментарий.
+ * Дата переносится и в движения склада этой печати. Назначение меняется, только пока нет продаж.
+ */
+export function updatePrintInfo(state, printId, f) {
+  const p = state.prints.find((x) => x.id === printId);
+  if (!p) return;
+  if (f.date && f.date !== p.date) {
+    p.date = f.date;
+    for (const m of state.movements) if (m.printId === p.id && (m.type === 'print' || m.type === 'failure')) m.date = f.date;
+  }
+  if (f.modelId && state.models.some((m) => m.id === f.modelId)) p.modelId = f.modelId;
+  if (f.comment !== undefined) p.comment = f.comment;
+  const hasSales = state.sales.some((s) => s.printId === p.id);
+  if (f.purposeId && f.purposeId !== p.purposeId && !hasSales) {
+    p.purposeId = f.purposeId;
+    if (p.finalized && p.split.good > 0) {
+      const isBiz = purposeGroupOf(state, p.purposeId) === 'business';
+      const share = isBiz ? Math.max(0, Math.min(100, p.ownerShare ?? C.num(state.settings.ownerShare))) : 0;
+      const unitPrice = share ? C.ownerUnitPrice(p.split.unit, p.ownerPriceMode, p.ownerPrice) : null;
+      p.outputs = [{ purposeId: p.purposeId, qty: p.split.good, analogPrice: isBiz ? p.analogPrice : null, ownerShare: share || null, unitPrice }];
+    }
+  }
+}
+
 export function setOwnerPrice(state, printId, { mode, price, share }) {
   const p = state.prints.find((x) => x.id === printId);
   if (!p || !p.finalized) return;
